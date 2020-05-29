@@ -1,0 +1,174 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><meta name="baidu-site-verification" content="1EB8XoOl0C"><meta name="google-site-verification" content="K7thEgdLm0UfRWJ5MGdF7sCcjClSzAlxFLPv2Oz5CGM"><title> Linux pid, tid · Bigman</title><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Linux pid, tid - Li Xiang"><meta name="keywords"><meta name="author" content="Li Xiang"><link rel="short icon" href="/images/favicon.ico"><link rel="stylesheet" href="/css/bubuzou.css"><link rel="search" type="application/opensearchdescription+xml" href="http://bigman.net.cn/atom.xml" title="Bigman"><script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+<script src='//unpkg.com/valine/dist/Valine.min.js'></script><meta name="generator" content="Hexo 4.2.1"><link rel="alternate" href="/atom.xml" title="Bigman" type="application/atom+xml">
+</head><body><header><div class="header row"> <a href="/" class="logo-link"><img src="/images/logo.png"></a><ul id="nav_list" class="nav nav-list"><li class="nav-list-item"><a href="/" target="_self" data-hover="博文" class="nav-list-link">博文</a></li><li class="nav-list-item"><a href="/archives/" target="_self" data-hover="归档" class="nav-list-link">归档</a></li><li class="nav-list-item"><a href="https://github.com/Moersity" target="_blank" data-hover="GITHUB" class="nav-list-link">GITHUB</a></li></ul><div class="search"><a id="search_btn" href="#search"></a></div><div id="nav_btn" class="nav-btn"><span></span><span></span><span></span></div></div></header><div class="row scroll-con"><section class="container"><!-- for archive page--><div id="postAr" class="post"><article class="post-block"><h1 class="post-title">Linux pid, tid</h1><div class="post-info">2020-05-29<p class="visit"><i data-identity="2020/05/29/Linux-pid-tid/" class="article-timer"></i><span>次访问</span></p></div><div class="post-content"><p> 在linux下，通过htop/top命令查看的进程/线程都是只有pid的，那么具体的tid信息是怎么获得的呢，以及他们的关系是怎样的?</p>
+<h4 id="stackoverflow有一个回答写的很好："><a href="#stackoverflow有一个回答写的很好：" class="headerlink" title="stackoverflow有一个回答写的很好："></a>stackoverflow有一个回答写的很好：</h4><blockquote>
+<p>It is complicated: <em>pid</em> is process identifier; <em>tid</em> is thread identifier.</p>
+<p>But as it happens, the kernel doesn’t make a real distinction between them: threads are just like processes but they share some things (memory, fds…) with other instances of the same <em>group</em>.</p>
+<p>So, a <em>tid</em> is actually the identifier of the schedulable object in the kernel (thread), while the <em>pid</em> is the identifier of the group of schedulable objects that share memory and fds (process).</p>
+<p>But to make things more interesting, when a process has only one thread (the initial situation and in the good old times the only one) the <em>pid</em> and the <em>tid</em> are always the same. So any function that works with a <em>tid</em> will automatically work with a <em>pid</em>.</p>
+<p>It is worth noting that many functions/system calls/command line utilities documented to work with <em>pid</em> actually use <em>tids</em>. But if the effect is process-wide you will simply not notice the difference.</p>
+</blockquote>
+<p>​    意思就是pid 是进程的标识符，tid是线程的标识符, 但是内核并不会真正的区分他们，线程仅仅是像一个进程但是可以和同一个组里的线程共享一些资源，比如内存，文件描述符等等，tid就是实际上内核调度的标识符，所以我们htop/top看到的某个线程的pid实际上就是tid,  它也一定绑定了一个进程的真正pid，如果进程只有一个线程，那么这么pid和tid就应该是相同的。</p>
+<h4 id="实际实验："><a href="#实际实验：" class="headerlink" title="实际实验："></a>实际实验：</h4><ol>
+<li>写一个脚本：</li>
+</ol>
+<figure class="highlight ruby"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">[</span><br><span class="line">  Thread.new &#123; Thread.current[<span class="string">"name"</span>] = <span class="string">"A"</span>; sleep <span class="number">100</span> &#125;,</span><br><span class="line">  Thread.new &#123; Thread.current[<span class="symbol">:name</span>]  = <span class="string">"B"</span>; sleep <span class="number">100</span> &#125;,</span><br><span class="line">  Thread.new &#123; Thread.current[<span class="string">"name"</span>] = <span class="string">"C"</span>; sleep <span class="number">100</span> &#125;</span><br><span class="line">].each <span class="keyword">do</span> <span class="params">|th|</span></span><br><span class="line">  th.join</span><br><span class="line">  puts <span class="string">"<span class="subst">#&#123;th.inspect&#125;</span>: <span class="subst">#&#123;th[<span class="symbol">:name</span>]&#125;</span>"</span></span><br><span class="line"><span class="keyword">end</span></span><br></pre></td></tr></table></figure>
+
+<ol start="2">
+<li>执行过程中看看htop的信息：</li>
+</ol>
+<p><img src="image-20200529130125415.png" alt="image-20200529130125415"></p>
+<p>​                            centos 4.19.43-300.el7.x86_64 版本下htop查看某个进程开了多个线程下的结果</p>
+<p>注：ruby中设置线程name在某些平台可能并不会生效</p>
+<blockquote>
+<p>set given name to the ruby thread. On some platform, it may set the name to pthread and/or kernel.</p>
+</blockquote>
+<p>可以看到，第一列是pid，每个线程拥有不同的pid，但是实际上是同属于一个父进程的，看到它们占用的资源是一样的</p>
+<h4 id="系统调用："><a href="#系统调用：" class="headerlink" title="系统调用："></a>系统调用：</h4><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/types.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/syscall.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">message</span></span></span><br><span class="line"><span class="class">&#123;</span></span><br><span class="line">    <span class="keyword">int</span> i;</span><br><span class="line">    <span class="keyword">int</span> j;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> *<span class="title">hello</span><span class="params">(struct message *str)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"child, the tid=%lu, pid=%d\n"</span>,pthread_self(),syscall(SYS_gettid));</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"the arg.i is %d, arg.j is %d\n"</span>,str-&gt;i,str-&gt;j);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"child, getpid()=%d\n"</span>,getpid());</span><br><span class="line">    <span class="keyword">while</span>(<span class="number">1</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span> *argv[])</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">message</span> <span class="title">test</span>;</span></span><br><span class="line">    <span class="keyword">pthread_t</span> thread_id;</span><br><span class="line">    test.i=<span class="number">10</span>;</span><br><span class="line">    test.j=<span class="number">20</span>;</span><br><span class="line">    pthread_create(&amp;thread_id,<span class="literal">NULL</span>,hello,&amp;test);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"parent, the tid=%lu, pid=%d\n"</span>,pthread_self(),syscall(SYS_gettid));</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"parent, getpid()=%d\n"</span>,getpid());</span><br><span class="line">    pthread_join(thread_id,<span class="literal">NULL</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>Output:</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">parent, the tid=139702253516608, pid=2278980</span><br><span class="line">parent, getpid()=2278980</span><br><span class="line">child, the tid=139702245132032, pid=2278981</span><br><span class="line">the arg.i is 10, arg.j is 20</span><br><span class="line">child, getpid()=2278980</span><br></pre></td></tr></table></figure>
+
+
+
+<ul>
+<li><p>getpid - 返回父进程的pid</p>
+</li>
+<li><p>syscall(SYS_gettid) -返回线程pid</p>
+</li>
+<li><p>pthread_self - 返回tid，在同一进程下不同，但是在不同进程下可能相同</p>
+</li>
+</ul>
+</div></article></div><div class="right-container"><div class="widget"><div id="arAnchorBar"></div></div></div></section></div><div class="right-menu"></div><div class="modal search-modal"><div class="input-field"><input type="text" id="search_input"><label for="search-input">搜索</label></div><div id="search_result" class="search-result"></div></div><div class="blog-overlay"></div><footer class="row"><div class="footer-con"><div class="paginator"><a href="/2020/05/28/hello-world/" title="Hello World" class="next">下一篇</a></div><a href="#comment" class="comment-anchor"></a><div id="vcomments"></div><script>new Valine({
+    el: "#vcomments",
+    appId: "aD8jJBpu4oew3ovNY73z6Rdq-gzGzoHsz",
+    appKey: "FdzS5SOPHdhYQoEUngQ8K2QW",
+    notify: false,
+    verify: false,
+    avatar: "robohash",
+    visitor: true,
+    placeholder: "随便说点什么～.～",
+});</script><div class="copyright"><p>© 2020 <a target="_blank">Li Xiang</a>, powered by <a href="https://hexo.io/" target="_blank">Hexo</a></p><p> <span style="padding-right: 6px;"> </span></p></div><div class="totop"><i></i></div></div></footer><script async src="//cdn.bootcss.com/mathjax/2.6.1/MathJax.js?config=TeX-MML-AM_CHTML"></script><script src="/scripts/jquery-1.8.2.min.js"></script><script src="/scripts/ar-anchor.js"></script><script src="/scripts/main.js"></script><script>(function(b,o,i,l,e,r){b.GoogleAnalyticsObject=l;b[l]||(b[l]=function(){(b[l].q=b[l].q||[]).push(arguments)});b[l].l=+new Date;e=o.createElement(i);r=o.getElementsByTagName(i)[0];e.src='//www.google-analytics.com/analytics.js';r.parentNode.insertBefore(e,r)}(window,document,'script','ga'));ga('create',"UA-167993791-1",'auto');ga('send','pageview');</script><script>const valineAPI = (() => {
+try {
+    AV.init("aD8jJBpu4oew3ovNY73z6Rdq-gzGzoHsz", "FdzS5SOPHdhYQoEUngQ8K2QW");
+} catch(error) {}
+const isExist = (identity) => {
+    identity = identity || getRealPath();
+    let query = new AV.Query('Timer');
+    return new Promise((resolve, reject) => {
+    query.equalTo("identity", identity);
+    query.find().then(results => {
+        resolve(results.length > 0);
+    }, error => reject(error));
+    })
+}
+
+const _get = (identity) => {
+    let query = null;
+    if(identity && identity instanceof Array){
+    let querys = [];
+    for(let i = 0; i < identity.length; ++i) {
+        querys[i] = new AV.Query('Timer');
+        querys[i].equalTo('identity', identity[i]);
+    }
+    query = AV.Query.or.apply(null ,querys);
+    } else {
+    identity = identity || getRealPath();
+    query = new AV.Query("Timer");
+    query.equalTo("identity", identity);
+    }
+
+    return new Promise((resolve, reject) => {
+    query.find()
+    .then(results => resolve(results))
+    .catch(error => reject(error))
+    })
+}
+
+const create = (identity) => {
+    identity = identity || getRealPath();
+    return new Promise((resolve, reject) => {
+    let Todo = AV.Object.extend('Timer');
+    let todo = new Todo();
+    todo.set("times", 1);
+    todo.set("identity", identity);
+    todo.save().then(res => resolve(true), error => reject(error));
+    })
+}
+
+const update = (identity) => {
+    identity = identity || getRealPath();
+    return new Promise((resolve, reject) => {
+    let query = new AV.Query('Timer');
+    query.equalTo("identity", identity);
+    query.find().then(todos => {
+        todos.forEach(todo => {
+        todo.set("times", todo.attributes.times + 1);
+        });
+        return AV.Object.saveAll(todos);
+    }).then(todos => resolve(true), error => reject(error));
+    })
+}
+
+return {
+    isExist,
+    _get,
+    update,
+    create
+}
+})()
+
+const calcAndWriteTimes = () => {
+let isPost = true;
+
+let timerAllDOM = document.querySelectorAll(".article-timer");
+
+if(isPost) {
+    let identity = timerAllDOM[0].getAttribute("data-identity");
+    valineAPI.isExist(identity)
+    .then(exist => {
+    if(exist) {
+        return valineAPI.update(identity);
+    }
+    return new Promise(resolve => resolve(true));
+    })
+    .then( succuess => valineAPI._get(identity))
+    .then( result => timerAllDOM[0].innerText = result[0].attributes.times)
+    .catch(error => console.log(error.message))
+    return ;
+}
+
+let timerDOMCache = {};
+
+for(let timerDOM of timerAllDOM) {
+    let identity = timerDOM.getAttribute("data-identity");
+    if(timerDOMCache.hasOwnProperty(identity)){
+    timerDOMCache[identity].dom.push(timerDOM);
+    }else{
+    timerDOMCache[identity] = {
+        dom: [timerDOM],
+        times: undefined
+    };
+    }
+}
+
+let identities = Object.keys(timerDOMCache);
+valineAPI._get(identities).then(results => {
+    for(let result of results) {
+    let {identity, times} = result.attributes;
+    timerDOMCache[identity].times = times;
+    timerDOMCache[identity].dom.map(item => item.innerText = times);
+    }
+    for(let identity of identities) {
+    if(timerDOMCache[identity].times){
+        continue;
+    }
+    timerDOMCache[identity].dom.map(item => item.innerText = 1);
+    valineAPI.create(identity);
+    }
+}).catch(error => console.log(error.message))
+}
+
+if(true){
+calcAndWriteTimes();
+}</script></body></html>
