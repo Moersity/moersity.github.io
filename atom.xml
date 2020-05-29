@@ -5,9 +5,9 @@
   <subtitle>most important, have fun</subtitle>
   <link href="/atom.xml" rel="self"/>
   
-  <link href="http://bigman.net.cn/"/>
+  <link href="https://moersity.github.io/"/>
   <updated>2020-05-29T06:15:42.284Z</updated>
-  <id>http://bigman.net.cn/</id>
+  <id>https://moersity.github.io/</id>
   
   <author>
     <name>Li Xiang</name>
@@ -18,8 +18,8 @@
   
   <entry>
     <title>Linux pid, tid</title>
-    <link href="http://bigman.net.cn/2020/05/29/Linux-pid-tid/"/>
-    <id>http://bigman.net.cn/2020/05/29/Linux-pid-tid/</id>
+    <link href="https://moersity.github.io/2020/05/29/Linux-pid-tid/"/>
+    <id>https://moersity.github.io/2020/05/29/Linux-pid-tid/</id>
     <published>2020-05-29T06:08:22.000Z</published>
     <updated>2020-05-29T06:15:42.284Z</updated>
     
@@ -41,8 +41,8 @@
   
   <entry>
     <title>Hello World</title>
-    <link href="http://bigman.net.cn/2020/05/28/hello-world/"/>
-    <id>http://bigman.net.cn/2020/05/28/hello-world/</id>
+    <link href="https://moersity.github.io/2020/05/28/hello-world/"/>
+    <id>https://moersity.github.io/2020/05/28/hello-world/</id>
     <published>2020-05-28T03:04:08.030Z</published>
     <updated>2020-05-28T03:04:08.030Z</updated>
     
