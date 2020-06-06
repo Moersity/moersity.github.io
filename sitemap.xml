@@ -2,9 +2,16 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   
   <url>
+    <loc>https://moersity.github.io/2020/06/06/DLM-distribute-lock-manager/</loc>
+    
+    <lastmod>2020-06-06T05:24:38.071Z</lastmod>
+    
+  </url>
+  
+  <url>
     <loc>https://moersity.github.io/2020/05/29/Linux-pid-tid/</loc>
     
-    <lastmod>2020-05-29T06:15:42.284Z</lastmod>
+    <lastmod>2020-06-06T04:20:23.691Z</lastmod>
     
   </url>
   
