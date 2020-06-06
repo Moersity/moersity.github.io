@@ -2,6 +2,13 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   
   <url>
+    <loc>https://moersity.github.io/about/index.html</loc>
+    
+    <lastmod>2020-06-06T06:04:34.047Z</lastmod>
+    
+  </url>
+  
+  <url>
     <loc>https://moersity.github.io/2020/06/06/DLM-distribute-lock-manager/</loc>
     
     <lastmod>2020-06-06T05:52:38.658Z</lastmod>
