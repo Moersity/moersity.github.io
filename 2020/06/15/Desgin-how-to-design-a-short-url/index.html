@@ -48,7 +48,7 @@
     
     <title>
         
-            Categories: 技术 | 
+            Desgin: how to design a short url | 
         
         Bigman
     </title>
@@ -59,7 +59,7 @@
 
     <meta name="format-detection" content="telephone=no"/>
     <meta name="description" itemprop="description" content="">
-    <meta name="keywords" content="">
+    <meta name="keywords" content=",degisn">
     <meta name="theme-color" content="#0097A7">
 
     <!-- Disable Fucking Bloody Baidu Tranformation -->
@@ -220,7 +220,7 @@
     <!-- WebAPP Icons -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="application-name" content="Bigman">
-    <meta name="msapplication-starturl" content="https://moersity.github.io/categories/%E6%8A%80%E6%9C%AF/">
+    <meta name="msapplication-starturl" content="https://moersity.github.io/2020/06/15/Desgin-how-to-design-a-short-url/">
     <meta name="msapplication-navbutton-color" content="#0097A7">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Bigman">
@@ -235,13 +235,16 @@
     
 
     <!-- The Open Graph protocol -->
-    <meta property="og:url" content="https://moersity.github.io/categories/%E6%8A%80%E6%9C%AF/">
+    <meta property="og:url" content="https://moersity.github.io/2020/06/15/Desgin-how-to-design-a-short-url/">
     <meta property="og:type" content="blog">
-    <meta property="og:title" content="Categories: 技术 | Bigman">
+    <meta property="og:title" content="Desgin: how to design a short url | Bigman">
     <meta property="og:image" content="/img/favicon.png">
     <meta property="og:description" content="">
-    
+    <meta property="og:article:tag" content="degisn"> 
 
+    
+        <meta property="article:published_time" content="Mon Jun 15 2020 19:43:02 GMT+0800">
+        <meta property="article:modified_time" content="Tue Jun 16 2020 20:15:22 GMT+0800">
     
 
     <!-- The Twitter Card protocol -->
@@ -249,13 +252,43 @@
 
     <!-- Add canonical link for SEO -->
     
-        <link rel="canonical" href="https://moersity.github.io/categories/%E6%8A%80%E6%9C%AF/index.html" />
+        <link rel="canonical" href="https://moersity.github.io/2020/06/15/Desgin-how-to-design-a-short-url/index.html" />
     
 
     <!-- Structured-data for SEO -->
     
         
 
+
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "mainEntityOfPage": "https://moersity.github.io/2020/06/15/Desgin-how-to-design-a-short-url/index.html",
+    "headline": "Desgin: how to design a short url",
+    "datePublished": "Mon Jun 15 2020 19:43:02 GMT+0800",
+    "dateModified": "Tue Jun 16 2020 20:15:22 GMT+0800",
+    "author": {
+        "@type": "Person",
+        "name": "Li Xiang",
+        "image": {
+            "@type": "ImageObject",
+            "url": "/img/avatar.png"
+        },
+        "description": "Most importantly, Have fun ..."
+    },
+    "publisher": {
+        "@type": "Organization",
+        "name": "Bigman",
+        "logo": {
+            "@type":"ImageObject",
+            "url": "/img/favicon.png"
+        }
+    },
+    "keywords": ",degisn",
+    "description": "",
+}
+</script>
 
 
     
@@ -290,160 +323,273 @@
                         </button>
                     
 
-                    <!-- Index Module -->
-<div class="material-index mdl-grid">
-    
-    <div class="locate-thumbnail-symbol"></div>
+                    <!-- Post TOC -->
 
-    <!-- Pin on top -->
+    
+    <!-- Back Button -->
+    <!--
+    <div class="material-back" id="backhome-div" tabindex="0">
+        <a class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--icon"
+           href="#" onclick="window.history.back();return false;"
+           target="_self"
+           role="button"
+           data-upgraded=",MaterialButton,MaterialRipple">
+            <i class="material-icons" role="presentation">arrow_back</i>
+            <span class="mdl-button__ripple-container">
+                <span class="mdl-ripple"></span>
+            </span>
+        </a>
+    </div>
+    -->
+
+
+    <!-- Left aligned menu below button -->
+    
+    
+    <button id="post-toc-trigger-btn"
+        class="mdl-button mdl-js-button mdl-button--icon">
+        <i class="material-icons">format_list_numbered</i>
+    </button>
+
+    <ul class="post-toc-wrap mdl-menu mdl-menu--bottom-left mdl-js-menu mdl-js-ripple-effect" for="post-toc-trigger-btn" style="max-height:80vh; overflow-y:scroll;">
+        <ol class="post-toc"><li class="post-toc-item post-toc-level-3"><a class="post-toc-link" href="#短链接设计问题"><span class="post-toc-number">1.</span> <span class="post-toc-text">短链接设计问题</span></a><ol class="post-toc-child"><li class="post-toc-item post-toc-level-4"><a class="post-toc-link" href="#问题描述："><span class="post-toc-number">1.1.</span> <span class="post-toc-text">问题描述：</span></a></li><li class="post-toc-item post-toc-level-4"><a class="post-toc-link" href="#短链接长度："><span class="post-toc-number">1.2.</span> <span class="post-toc-text">短链接长度：</span></a></li><li class="post-toc-item post-toc-level-4"><a class="post-toc-link" href="#如何生成"><span class="post-toc-number">1.3.</span> <span class="post-toc-text">如何生成</span></a></li><li class="post-toc-item post-toc-level-4"><a class="post-toc-link" href="#一对一还是一对多"><span class="post-toc-number">1.4.</span> <span class="post-toc-text">一对一还是一对多</span></a></li><li class="post-toc-item post-toc-level-4"><a class="post-toc-link" href="#返回301还是302"><span class="post-toc-number">1.5.</span> <span class="post-toc-text">返回301还是302</span></a></li></ol></li></ol>
+    </ul>
     
 
-    <!-- Normal Post -->
-    
-        
-            
-                <!-- Paradox Thumbnail -->
-                <div class="post_entry-module mdl-card mdl-shadow--2dp mdl-cell mdl-cell--12-col fade out">
-    <!-- Post Thumbnail -->
+
+
+
+<!-- Layouts -->
+
+    <!-- Post Module -->
+    <div class="material-post_container">
+
+        <div class="material-post mdl-grid">
+            <div class="mdl-card mdl-shadow--4dp mdl-cell mdl-cell--12-col">
+
+                <!-- Post Header(Thumbnail & Title) -->
+                
+    <!-- Paradox Post Header -->
     
         
             <!-- Random Thumbnail -->
             <div class="post_thumbnail-random mdl-card__media mdl-color-text--grey-50">
-        
-    
+            <script type="text/ls-javascript" id="post-thumbnail-script">
+    var randomNum = Math.floor(Math.random() * 19 + 1);
 
-        <!-- Post Title -->
-        <p class="article-headline-p"><a href="/2020/06/06/DLM-distribute-lock-manager/">DLM: distribute lock manager</a></p>
-    </div>
-
-    <!-- Post Excerpt -->
-    <div class="mdl-color-text--grey-600 mdl-card__supporting-text post_entry-content">
-        
-            
-        
-        &nbsp;&nbsp;&nbsp;
-        <span>
-            <a href="/2020/06/06/DLM-distribute-lock-manager/" target="_self">Read more</a>
-        </span>
-    </div>
-    <!-- Post_entry Info-->
-    <div id="post_entry-info">
-        <div id="post_entry-left-info" class="mdl-card__supporting-text meta mdl-color-text--grey-600 ">
-            <!-- Author Avatar -->
-            <div id="author-avatar">
-                <img src="/img/avatar.png" width="44px" height="44px" alt="Li Xiang's avatar">
-            </div>
-            <div>
-                <strong>Li Xiang</strong>
-                <span>Jun 06, 2020</span>
-            </div>
-        </div>
-        <div id="post_entry-right-info">
-          
-              <!-- Category -->
-              <span class="post_entry-category">
-                  <a class="post_category-link" href="/categories/%E6%8A%80%E6%9C%AF/">技术</a>
-              </span>
-            
-
-            
-
-            
-
-            <!-- Post Views -->
-            <span class="post_entry-views">
-            </span>
-        </div>
-    </div>
-</div>
-
-            
-            
-        
-    
-        
-            
-                <!-- Paradox Thumbnail -->
-                <div class="post_entry-module mdl-card mdl-shadow--2dp mdl-cell mdl-cell--12-col fade out">
-    <!-- Post Thumbnail -->
-    
-        
-            <!-- Random Thumbnail -->
-            <div class="post_thumbnail-random mdl-card__media mdl-color-text--grey-50">
-        
-    
-
-        <!-- Post Title -->
-        <p class="article-headline-p"><a href="/2020/05/29/Linux-pid-tid/">Linux pid, tid</a></p>
-    </div>
-
-    <!-- Post Excerpt -->
-    <div class="mdl-color-text--grey-600 mdl-card__supporting-text post_entry-content">
-        
-             在linux下，通过htop/top命令查看的进程/线程都是只有pid的，那么具体的tid信息是怎么获得的呢，以及他们的关系是怎样的?
-
-        
-        &nbsp;&nbsp;&nbsp;
-        <span>
-            <a href="/2020/05/29/Linux-pid-tid/" target="_self">Read more</a>
-        </span>
-    </div>
-    <!-- Post_entry Info-->
-    <div id="post_entry-info">
-        <div id="post_entry-left-info" class="mdl-card__supporting-text meta mdl-color-text--grey-600 ">
-            <!-- Author Avatar -->
-            <div id="author-avatar">
-                <img src="/img/avatar.png" width="44px" height="44px" alt="Li Xiang's avatar">
-            </div>
-            <div>
-                <strong>Li Xiang</strong>
-                <span>May 29, 2020</span>
-            </div>
-        </div>
-        <div id="post_entry-right-info">
-          
-              <!-- Category -->
-              <span class="post_entry-category">
-                  <a class="post_category-link" href="/categories/%E6%8A%80%E6%9C%AF/">技术</a>
-              </span>
-            
-
-            
-
-            
-
-            <!-- Post Views -->
-            <span class="post_entry-views">
-            </span>
-        </div>
-    </div>
-</div>
-
-            
-            
-        
-    
-
-    
-
-    
-        <script type="text/ls-javascript" id="thumbnail-script">
-    var randomNum;
-
-    var locatePost = $('.locate-thumbnail-symbol').next();
-    for(var i = 0; i < 10; i++) {
-        randomNum = Math.floor(Math.random() * 19 + 1);
-
-        locatePost.children('.post_thumbnail-random').attr('id', 'random_thumbnail-'+randomNum);
-        locatePost.children('.post_thumbnail-random').attr('data-original', '/img/random/material-' + randomNum + '.png');
+    $('.post_thumbnail-random').attr('data-original', '/img/random/material-' + randomNum + '.png');
     $('.post_thumbnail-random').addClass('lazy');
-
-        locatePost = locatePost.next();
-    }
 </script>
 
+        
+    
+            <p class="article-headline-p">
+                Desgin: how to design a short url
+            </p>
+        </div>
+
+
+
+
+
+                
+                    <!-- Paradox Post Info -->
+                    <div class="mdl-color-text--grey-700 mdl-card__supporting-text meta">
+
+    <!-- Author Avatar -->
+    <div id="author-avatar">
+        <img src="/img/avatar.png" width="44px" height="44px" alt="Author Avatar"/>
+    </div>
+    <!-- Author Name & Date -->
+    <div>
+        <strong>Li Xiang</strong>
+        <span>Jun 15, 2020</span>
+    </div>
+
+    <div class="section-spacer"></div>
+
+    <!-- Favorite -->
+    <!--
+        <button id="article-functions-like-button" class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--icon btn-like">
+            <i class="material-icons" role="presentation">favorite</i>
+            <span class="visuallyhidden">favorites</span>
+        </button>
+    -->
+
+    <!-- Qrcode -->
+    
+
+    <!-- Tags (bookmark) -->
+    
+    <button id="article-functions-viewtags-button" class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--icon">
+        <i class="material-icons" role="presentation">bookmark</i>
+        <span class="visuallyhidden">bookmark</span>
+    </button>
+    <ul class="mdl-menu mdl-menu--bottom-right mdl-js-menu mdl-js-ripple-effect" for="article-functions-viewtags-button">
+        <li class="mdl-menu__item">
+        <a class="post_tag-link" href="/tags/degisn/" rel="tag">degisn</a>
+    </ul>
+    
+
+    <!-- Share -->
+    
+        <button id="article-fuctions-share-button" class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--icon">
+    <i class="material-icons" role="presentation">share</i>
+    <span class="visuallyhidden">share</span>
+</button>
+<ul class="mdl-menu mdl-menu--bottom-right mdl-js-menu mdl-js-ripple-effect" for="article-fuctions-share-button">
+    
+
+    
+
+    <!-- Share Weibo -->
+    
+        <a class="post_share-link" href="http://service.weibo.com/share/share.php?appkey=&title=Desgin: how to design a short url&url=https://moersity.github.io/2020/06/15/Desgin-how-to-design-a-short-url/index.html&pic=https://moersity.github.io/img/favicon.png&searchPic=false&style=simple" target="_blank">
+            <li class="mdl-menu__item">
+                Share to Weibo
+            </li>
+        </a>
+    
+
+    <!-- Share Twitter -->
+    
+        <a class="post_share-link" href="https://twitter.com/intent/tweet?text=Desgin: how to design a short url&url=https://moersity.github.io/2020/06/15/Desgin-how-to-design-a-short-url/index.html&via=Li Xiang" target="_blank">
+            <li class="mdl-menu__item">
+                Share to Twitter
+            </li>
+        </a>
+    
+
+    <!-- Share Facebook -->
+    
+
+    <!-- Share Google+ -->
+    
+
+    <!-- Share LinkedIn -->
+    
+
+    <!-- Share QQ -->
+    
+
+    <!-- Share Telegram -->
+    
+</ul>
+
     
 </div>
+
+                
+
+                <!-- Post Content -->
+                <div id="post-content" class="mdl-color-text--grey-700 mdl-card__supporting-text fade out">
+    
+        <h3 id="短链接设计问题"><a href="#短链接设计问题" class="headerlink" title="短链接设计问题"></a>短链接设计问题</h3><h4 id="问题描述："><a href="#问题描述：" class="headerlink" title="问题描述："></a>问题描述：</h4><p>在Weibo或者其他社交软件中，经常会有分享链接的行为，如果直接使用原始链接存储，会带来以下问题：</p>
+<ol>
+<li>存储问题，如果链接的长度过大，带来的是直接的存储成本</li>
+<li>分析问题，在社交软件中，我们可能会基于用户的分享内容做定制化推荐，如果用原始的url, 不好做后续跟踪和分析</li>
+</ol>
+<h4 id="短链接长度："><a href="#短链接长度：" class="headerlink" title="短链接长度："></a>短链接长度：</h4><p>通常会是7位的地址，如wb.in/ffA1321</p>
+<p>为什么会是7位： </p>
+<ol>
+<li>当前互联网上的网页总数大概是 45亿(参考 <a href="http://www.worldwidewebsize.com/" target="_blank" rel="noopener">http://www.worldwidewebsize.com</a>)，超过了 $$2^{32}$$=42949672962,</li>
+</ol>
+<p>所以通常使用int64 来存储，用一个内部id来确定对应的网站</p>
+<ol start="2">
+<li>如果直接使用int来存储，会带来很多问题，所以通常会把int转化为字符串存储，int转化为字符串，主要使用的就是62进制算法，</li>
+</ol>
+<p>通常我们生成的url只包含a-z0-9A-Z的字符，而将64位int压缩为字符串通常大小是$$\log{62}(2^{64}−1)=10.7$$， 如若使用7位的话就是$$62^{7}$$ = 3521614606208, 远远超过现有的地址总数</p>
+<h4 id="如何生成"><a href="#如何生成" class="headerlink" title="如何生成"></a>如何生成</h4><ol>
+<li><p>哈希，根据输入的网址进行哈希，生成一个64位的int，然后对这个int进行base62编码</p>
+<p>这样做好处是简单，如果是网址很少的情况下是完全可以满足使用的，但是存在一个问题，那就是哈希可能出现冲突，即两个不同的原始url被映射到了同一个int上，这个时候就需要做冲突检测了，等于是带来了新的问题。</p>
+</li>
+<li><p>数据库生成id，使用数据库自增的id，可以保证id的唯一性，并且可以通过这个主键索引非常高效的找到对应的原始url</p>
+<p>这样做的好处是不会存在冲突，但是还是会有一定问题，第一个问题是数据库id自增只能保证在单机情况下唯一自增，缺乏高可用，第二个问题是这个生成的id是完全顺序的，对于爬虫来说简直不要太友好，直接用base62编码就可以爬到你的所有短链接了。    </p>
+</li>
+<li><p>多数据库生成id, 使用多个数据库实例，每个数据库存储部分映射关系，在启动的时候决定数据库使用的序号启初是多少，然后每次生成的都增加n个实例，如数据库1初始位0，数据库2初始就为1，然后数据库1生成的分别就是0，2，4…, 数据库2生成的分别就是1，3，5…，这样做解决了单点问题，但是还是存在容易被爬虫攻击的问题</p>
+</li>
+<li><p>分布式id生成器，twiteer snowflake</p>
+</li>
+</ol>
+<p><img src="http://121.40.136.3/wp-content/uploads/2015/04/snowflake-64bit.jpg" alt="img"></p>
+<h4 id="一对一还是一对多"><a href="#一对一还是一对多" class="headerlink" title="一对一还是一对多"></a>一对一还是一对多</h4><p>一个同样的地址，在不同的用户，地点，时间下产生的短链接是否是相同的，从技术的角度上来说，存储单一的短链接是最节省资源的，但是在现实世界中，这样生成的短链接是没有特定性的，丢失了很多有价值的商业数据，如做用户跟踪，用户画像, 所以应该是一对多的</p>
+<h4 id="返回301还是302"><a href="#返回301还是302" class="headerlink" title="返回301还是302"></a>返回301还是302</h4><p>应该返回302，应该302默认是不会被浏览器缓存，所以能多次请求到我们的服务器，用于做统计分析</p>
+
+        
+    
+
+    
+</div>
+
+
+                
+
+                <!-- Post Comments -->
+                
+                    
+    <!-- 使用 DISQUS -->
+<div id="disqus-comment">
+    <div id="disqus_thread"></div>
+<script type="text/javascript">
+    var disqus_config = function () {
+        this.page.url = 'https://moersity.github.io/2020/06/15/Desgin-how-to-design-a-short-url/';  // Replace PAGE_URL with your page's canonical URL variable
+        this.page.identifier = 'https://moersity.github.io/2020/06/15/Desgin-how-to-design-a-short-url/'; // Replace PAGE_IDENTIFIER with your page's unique identifier variable
+    };
+</script>
+<script type="text/ls-javascript" id="disqus-thread-script">
+    queue.offer(function() {
+            (function() { // DON'T EDIT BELOW THIS LINE
+                var d = document;
+                var s = d.createElement('script');
+                s.src = '//moersity.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', + new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        });
+</script>
+
+</div>
+<style>
+    #disqus-comment{
+        background-color: #eee;
+        padding: 2pc;
+    }
+</style>
+
+                
+            </div>
+
+            <!-- Post Prev & Next Nav -->
+            <nav class="material-nav mdl-color-text--grey-50 mdl-cell mdl-cell--12-col">
+    <!-- Prev Nav -->
+    
+        <a href="/2020/06/16/Http-Code-3xx-which-to-use/" id="post_nav-newer" class="prev-content">
+            <button class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--icon mdl-color--white mdl-color-text--grey-900" role="presentation">
+                <i class="material-icons">arrow_back</i>
+            </button>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            Newer
+        </a>
+    
+
+    <!-- Section Spacer -->
+    <div class="section-spacer"></div>
+
+    <!-- Next Nav -->
+    
+        <a href="/2020/06/06/DLM-distribute-lock-manager/" id="post_nav-older" class="next-content">
+            Older
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            <button class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--icon mdl-color--white mdl-color-text--grey-900" role="presentation">
+                <i class="material-icons">arrow_forward</i>
+            </button>
+        </a>
+    
+</nav>
+
+        </div>
+    </div>
+
 
 
                     

@@ -48,7 +48,7 @@
     
     <title>
         
-            Categories: 技术 | 
+            Http Code: 3xx, which to use | 
         
         Bigman
     </title>
@@ -59,7 +59,7 @@
 
     <meta name="format-detection" content="telephone=no"/>
     <meta name="description" itemprop="description" content="">
-    <meta name="keywords" content="">
+    <meta name="keywords" content=",http">
     <meta name="theme-color" content="#0097A7">
 
     <!-- Disable Fucking Bloody Baidu Tranformation -->
@@ -220,7 +220,7 @@
     <!-- WebAPP Icons -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="application-name" content="Bigman">
-    <meta name="msapplication-starturl" content="https://moersity.github.io/categories/%E6%8A%80%E6%9C%AF/">
+    <meta name="msapplication-starturl" content="https://moersity.github.io/2020/06/16/Http-Code-3xx-which-to-use/">
     <meta name="msapplication-navbutton-color" content="#0097A7">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Bigman">
@@ -235,13 +235,16 @@
     
 
     <!-- The Open Graph protocol -->
-    <meta property="og:url" content="https://moersity.github.io/categories/%E6%8A%80%E6%9C%AF/">
+    <meta property="og:url" content="https://moersity.github.io/2020/06/16/Http-Code-3xx-which-to-use/">
     <meta property="og:type" content="blog">
-    <meta property="og:title" content="Categories: 技术 | Bigman">
+    <meta property="og:title" content="Http Code: 3xx, which to use | Bigman">
     <meta property="og:image" content="/img/favicon.png">
     <meta property="og:description" content="">
-    
+    <meta property="og:article:tag" content="http"> 
 
+    
+        <meta property="article:published_time" content="Tue Jun 16 2020 20:14:40 GMT+0800">
+        <meta property="article:modified_time" content="Tue Jun 16 2020 20:22:56 GMT+0800">
     
 
     <!-- The Twitter Card protocol -->
@@ -249,13 +252,43 @@
 
     <!-- Add canonical link for SEO -->
     
-        <link rel="canonical" href="https://moersity.github.io/categories/%E6%8A%80%E6%9C%AF/index.html" />
+        <link rel="canonical" href="https://moersity.github.io/2020/06/16/Http-Code-3xx-which-to-use/index.html" />
     
 
     <!-- Structured-data for SEO -->
     
         
 
+
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "mainEntityOfPage": "https://moersity.github.io/2020/06/16/Http-Code-3xx-which-to-use/index.html",
+    "headline": "Http Code: 3xx, which to use",
+    "datePublished": "Tue Jun 16 2020 20:14:40 GMT+0800",
+    "dateModified": "Tue Jun 16 2020 20:22:56 GMT+0800",
+    "author": {
+        "@type": "Person",
+        "name": "Li Xiang",
+        "image": {
+            "@type": "ImageObject",
+            "url": "/img/avatar.png"
+        },
+        "description": "Most importantly, Have fun ..."
+    },
+    "publisher": {
+        "@type": "Organization",
+        "name": "Bigman",
+        "logo": {
+            "@type":"ImageObject",
+            "url": "/img/favicon.png"
+        }
+    },
+    "keywords": ",http",
+    "description": "",
+}
+</script>
 
 
     
@@ -290,160 +323,247 @@
                         </button>
                     
 
-                    <!-- Index Module -->
-<div class="material-index mdl-grid">
-    
-    <div class="locate-thumbnail-symbol"></div>
+                    <!-- Post TOC -->
 
-    <!-- Pin on top -->
+    
+    <!-- Back Button -->
+    <!--
+    <div class="material-back" id="backhome-div" tabindex="0">
+        <a class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--icon"
+           href="#" onclick="window.history.back();return false;"
+           target="_self"
+           role="button"
+           data-upgraded=",MaterialButton,MaterialRipple">
+            <i class="material-icons" role="presentation">arrow_back</i>
+            <span class="mdl-button__ripple-container">
+                <span class="mdl-ripple"></span>
+            </span>
+        </a>
+    </div>
+    -->
+
+
+    <!-- Left aligned menu below button -->
+    
+    
+    <button id="post-toc-trigger-btn"
+        class="mdl-button mdl-js-button mdl-button--icon">
+        <i class="material-icons">format_list_numbered</i>
+    </button>
+
+    <ul class="post-toc-wrap mdl-menu mdl-menu--bottom-left mdl-js-menu mdl-js-ripple-effect" for="post-toc-trigger-btn" style="max-height:80vh; overflow-y:scroll;">
+        <ol class="post-toc"><li class="post-toc-item post-toc-level-4"><a class="post-toc-link" href="#http-重定向有很多code，应该使用哪一个呢？"><span class="post-toc-number">1.</span> <span class="post-toc-text">http 重定向有很多code，应该使用哪一个呢？</span></a><ol class="post-toc-child"><li class="post-toc-item post-toc-level-6"><a class="post-toc-link" href="#300-Mutiple-Choice"><span class="post-toc-number">1.0.1.</span> <span class="post-toc-text">300 Mutiple Choice</span></a></li><li class="post-toc-item post-toc-level-6"><a class="post-toc-link" href="#301-Move-Permanentley"><span class="post-toc-number">1.0.2.</span> <span class="post-toc-text">301 Move Permanentley</span></a></li><li class="post-toc-item post-toc-level-6"><a class="post-toc-link" href="#302-Found"><span class="post-toc-number">1.0.3.</span> <span class="post-toc-text">302 Found</span></a></li><li class="post-toc-item post-toc-level-6"><a class="post-toc-link" href="#303-See-Other"><span class="post-toc-number">1.0.4.</span> <span class="post-toc-text">303 See Other</span></a></li><li class="post-toc-item post-toc-level-6"><a class="post-toc-link" href="#304-Not-Modified"><span class="post-toc-number">1.0.5.</span> <span class="post-toc-text">304 Not Modified</span></a></li><li class="post-toc-item post-toc-level-6"><a class="post-toc-link" href="#307-Temporary-Redirect"><span class="post-toc-number">1.0.6.</span> <span class="post-toc-text">307 Temporary Redirect</span></a></li><li class="post-toc-item post-toc-level-6"><a class="post-toc-link" href="#308-Permanent-Redirect"><span class="post-toc-number">1.0.7.</span> <span class="post-toc-text">308 Permanent Redirect</span></a></li></ol></li></ol></li><li class="post-toc-item post-toc-level-4"><a class="post-toc-link" href="#301，302-gt-307-308"><span class="post-toc-number">2.</span> <span class="post-toc-text">301，302  -&gt;  307, 308</span></a></li></ol>
+    </ul>
     
 
-    <!-- Normal Post -->
-    
-        
-            
-                <!-- Paradox Thumbnail -->
-                <div class="post_entry-module mdl-card mdl-shadow--2dp mdl-cell mdl-cell--12-col fade out">
-    <!-- Post Thumbnail -->
+
+
+
+<!-- Layouts -->
+
+    <!-- Post Module -->
+    <div class="material-post_container">
+
+        <div class="material-post mdl-grid">
+            <div class="mdl-card mdl-shadow--4dp mdl-cell mdl-cell--12-col">
+
+                <!-- Post Header(Thumbnail & Title) -->
+                
+    <!-- Paradox Post Header -->
     
         
             <!-- Random Thumbnail -->
             <div class="post_thumbnail-random mdl-card__media mdl-color-text--grey-50">
-        
-    
+            <script type="text/ls-javascript" id="post-thumbnail-script">
+    var randomNum = Math.floor(Math.random() * 19 + 1);
 
-        <!-- Post Title -->
-        <p class="article-headline-p"><a href="/2020/06/06/DLM-distribute-lock-manager/">DLM: distribute lock manager</a></p>
-    </div>
-
-    <!-- Post Excerpt -->
-    <div class="mdl-color-text--grey-600 mdl-card__supporting-text post_entry-content">
-        
-            
-        
-        &nbsp;&nbsp;&nbsp;
-        <span>
-            <a href="/2020/06/06/DLM-distribute-lock-manager/" target="_self">Read more</a>
-        </span>
-    </div>
-    <!-- Post_entry Info-->
-    <div id="post_entry-info">
-        <div id="post_entry-left-info" class="mdl-card__supporting-text meta mdl-color-text--grey-600 ">
-            <!-- Author Avatar -->
-            <div id="author-avatar">
-                <img src="/img/avatar.png" width="44px" height="44px" alt="Li Xiang's avatar">
-            </div>
-            <div>
-                <strong>Li Xiang</strong>
-                <span>Jun 06, 2020</span>
-            </div>
-        </div>
-        <div id="post_entry-right-info">
-          
-              <!-- Category -->
-              <span class="post_entry-category">
-                  <a class="post_category-link" href="/categories/%E6%8A%80%E6%9C%AF/">技术</a>
-              </span>
-            
-
-            
-
-            
-
-            <!-- Post Views -->
-            <span class="post_entry-views">
-            </span>
-        </div>
-    </div>
-</div>
-
-            
-            
-        
-    
-        
-            
-                <!-- Paradox Thumbnail -->
-                <div class="post_entry-module mdl-card mdl-shadow--2dp mdl-cell mdl-cell--12-col fade out">
-    <!-- Post Thumbnail -->
-    
-        
-            <!-- Random Thumbnail -->
-            <div class="post_thumbnail-random mdl-card__media mdl-color-text--grey-50">
-        
-    
-
-        <!-- Post Title -->
-        <p class="article-headline-p"><a href="/2020/05/29/Linux-pid-tid/">Linux pid, tid</a></p>
-    </div>
-
-    <!-- Post Excerpt -->
-    <div class="mdl-color-text--grey-600 mdl-card__supporting-text post_entry-content">
-        
-             在linux下，通过htop/top命令查看的进程/线程都是只有pid的，那么具体的tid信息是怎么获得的呢，以及他们的关系是怎样的?
-
-        
-        &nbsp;&nbsp;&nbsp;
-        <span>
-            <a href="/2020/05/29/Linux-pid-tid/" target="_self">Read more</a>
-        </span>
-    </div>
-    <!-- Post_entry Info-->
-    <div id="post_entry-info">
-        <div id="post_entry-left-info" class="mdl-card__supporting-text meta mdl-color-text--grey-600 ">
-            <!-- Author Avatar -->
-            <div id="author-avatar">
-                <img src="/img/avatar.png" width="44px" height="44px" alt="Li Xiang's avatar">
-            </div>
-            <div>
-                <strong>Li Xiang</strong>
-                <span>May 29, 2020</span>
-            </div>
-        </div>
-        <div id="post_entry-right-info">
-          
-              <!-- Category -->
-              <span class="post_entry-category">
-                  <a class="post_category-link" href="/categories/%E6%8A%80%E6%9C%AF/">技术</a>
-              </span>
-            
-
-            
-
-            
-
-            <!-- Post Views -->
-            <span class="post_entry-views">
-            </span>
-        </div>
-    </div>
-</div>
-
-            
-            
-        
-    
-
-    
-
-    
-        <script type="text/ls-javascript" id="thumbnail-script">
-    var randomNum;
-
-    var locatePost = $('.locate-thumbnail-symbol').next();
-    for(var i = 0; i < 10; i++) {
-        randomNum = Math.floor(Math.random() * 19 + 1);
-
-        locatePost.children('.post_thumbnail-random').attr('id', 'random_thumbnail-'+randomNum);
-        locatePost.children('.post_thumbnail-random').attr('data-original', '/img/random/material-' + randomNum + '.png');
+    $('.post_thumbnail-random').attr('data-original', '/img/random/material-' + randomNum + '.png');
     $('.post_thumbnail-random').addClass('lazy');
-
-        locatePost = locatePost.next();
-    }
 </script>
 
+        
+    
+            <p class="article-headline-p">
+                Http Code: 3xx, which to use
+            </p>
+        </div>
+
+
+
+
+
+                
+                    <!-- Paradox Post Info -->
+                    <div class="mdl-color-text--grey-700 mdl-card__supporting-text meta">
+
+    <!-- Author Avatar -->
+    <div id="author-avatar">
+        <img src="/img/avatar.png" width="44px" height="44px" alt="Author Avatar"/>
+    </div>
+    <!-- Author Name & Date -->
+    <div>
+        <strong>Li Xiang</strong>
+        <span>Jun 16, 2020</span>
+    </div>
+
+    <div class="section-spacer"></div>
+
+    <!-- Favorite -->
+    <!--
+        <button id="article-functions-like-button" class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--icon btn-like">
+            <i class="material-icons" role="presentation">favorite</i>
+            <span class="visuallyhidden">favorites</span>
+        </button>
+    -->
+
+    <!-- Qrcode -->
+    
+
+    <!-- Tags (bookmark) -->
+    
+    <button id="article-functions-viewtags-button" class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--icon">
+        <i class="material-icons" role="presentation">bookmark</i>
+        <span class="visuallyhidden">bookmark</span>
+    </button>
+    <ul class="mdl-menu mdl-menu--bottom-right mdl-js-menu mdl-js-ripple-effect" for="article-functions-viewtags-button">
+        <li class="mdl-menu__item">
+        <a class="post_tag-link" href="/tags/http/" rel="tag">http</a>
+    </ul>
+    
+
+    <!-- Share -->
+    
+        <button id="article-fuctions-share-button" class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--icon">
+    <i class="material-icons" role="presentation">share</i>
+    <span class="visuallyhidden">share</span>
+</button>
+<ul class="mdl-menu mdl-menu--bottom-right mdl-js-menu mdl-js-ripple-effect" for="article-fuctions-share-button">
+    
+
+    
+
+    <!-- Share Weibo -->
+    
+        <a class="post_share-link" href="http://service.weibo.com/share/share.php?appkey=&title=Http Code: 3xx, which to use&url=https://moersity.github.io/2020/06/16/Http-Code-3xx-which-to-use/index.html&pic=https://moersity.github.io/img/favicon.png&searchPic=false&style=simple" target="_blank">
+            <li class="mdl-menu__item">
+                Share to Weibo
+            </li>
+        </a>
+    
+
+    <!-- Share Twitter -->
+    
+        <a class="post_share-link" href="https://twitter.com/intent/tweet?text=Http Code: 3xx, which to use&url=https://moersity.github.io/2020/06/16/Http-Code-3xx-which-to-use/index.html&via=Li Xiang" target="_blank">
+            <li class="mdl-menu__item">
+                Share to Twitter
+            </li>
+        </a>
+    
+
+    <!-- Share Facebook -->
+    
+
+    <!-- Share Google+ -->
+    
+
+    <!-- Share LinkedIn -->
+    
+
+    <!-- Share QQ -->
+    
+
+    <!-- Share Telegram -->
+    
+</ul>
+
     
 </div>
+
+                
+
+                <!-- Post Content -->
+                <div id="post-content" class="mdl-color-text--grey-700 mdl-card__supporting-text fade out">
+    
+        <h4 id="http-重定向有很多code，应该使用哪一个呢？"><a href="#http-重定向有很多code，应该使用哪一个呢？" class="headerlink" title="http 重定向有很多code，应该使用哪一个呢？"></a>http 重定向有很多code，应该使用哪一个呢？</h4><h6 id="300-Mutiple-Choice"><a href="#300-Mutiple-Choice" class="headerlink" title="300 Mutiple Choice"></a>300 Mutiple Choice</h6><p>是有多个重定向地址，提示给浏览器或者用户选择</p>
+<h6 id="301-Move-Permanentley"><a href="#301-Move-Permanentley" class="headerlink" title="301 Move Permanentley"></a>301 Move Permanentley</h6><p>是永久重定向，表示资源已经被永久移动了，默认这个响应是可以缓存的，所以如果用户第一次使用了这个响应，下一次就不会访问我们的服务了</p>
+<h6 id="302-Found"><a href="#302-Found" class="headerlink" title="302 Found"></a>302 Found</h6><p>是临时重定向，表示资源被临时更换地址，默认这个响应是不缓存的，所以可以用来记录，跟踪分析</p>
+<h6 id="303-See-Other"><a href="#303-See-Other" class="headerlink" title="303 See Other"></a>303 See Other</h6><p>用于重定向将post请求变更为get请求到新的地址</p>
+<h6 id="304-Not-Modified"><a href="#304-Not-Modified" class="headerlink" title="304 Not Modified"></a>304 Not Modified</h6><p>未更改，表明资源未更改，直接返回空白</p>
+<h6 id="307-Temporary-Redirect"><a href="#307-Temporary-Redirect" class="headerlink" title="307 Temporary Redirect"></a>307 Temporary Redirect</h6><p>资源被临时重定向，与302的区别是重定向的方法必须和原请求方法一样，默认不缓存</p>
+<h6 id="308-Permanent-Redirect"><a href="#308-Permanent-Redirect" class="headerlink" title="308 Permanent Redirect"></a>308 Permanent Redirect</h6><p>资源被永久重定向，与301的区别是重定向的方法必须和原请求方法一样，默认缓存</p>
+<h4 id="301，302-gt-307-308"><a href="#301，302-gt-307-308" class="headerlink" title="301，302  -&gt;  307, 308"></a>301，302  -&gt;  307, 308</h4><p>其实301，302，和307，308的语意是一样的，区别在于由于历史原因，很多浏览器将post请求返回的301，302重定向默认修改为了get请求向新的地址，307，308的意义是必须使用初始请求的方法进行重定向，不能将post请求直接修改为get请求</p>
+<p>那么303，其实就是限制了将所有请求都重定向为get请求，post请求不一定是幂等的，标准实现应该是提示用户是否继续执行post请求，默认转换为get请求所以这样做的好处是防止错误请求重定向，带来系统的副作用。</p>
+<blockquote>
+<p><a href="https://zhuanlan.zhihu.com/p/60669395" target="_blank" rel="noopener">https://zhuanlan.zhihu.com/p/60669395</a> HTTP 中的 301、302、303、307、308 响应状态码</p>
+</blockquote>
+
+        
+    
+
+    
+</div>
+
+
+                
+
+                <!-- Post Comments -->
+                
+                    
+    <!-- 使用 DISQUS -->
+<div id="disqus-comment">
+    <div id="disqus_thread"></div>
+<script type="text/javascript">
+    var disqus_config = function () {
+        this.page.url = 'https://moersity.github.io/2020/06/16/Http-Code-3xx-which-to-use/';  // Replace PAGE_URL with your page's canonical URL variable
+        this.page.identifier = 'https://moersity.github.io/2020/06/16/Http-Code-3xx-which-to-use/'; // Replace PAGE_IDENTIFIER with your page's unique identifier variable
+    };
+</script>
+<script type="text/ls-javascript" id="disqus-thread-script">
+    queue.offer(function() {
+            (function() { // DON'T EDIT BELOW THIS LINE
+                var d = document;
+                var s = d.createElement('script');
+                s.src = '//moersity.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', + new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        });
+</script>
+
+</div>
+<style>
+    #disqus-comment{
+        background-color: #eee;
+        padding: 2pc;
+    }
+</style>
+
+                
+            </div>
+
+            <!-- Post Prev & Next Nav -->
+            <nav class="material-nav mdl-color-text--grey-50 mdl-cell mdl-cell--12-col">
+    <!-- Prev Nav -->
+    
+
+    <!-- Section Spacer -->
+    <div class="section-spacer"></div>
+
+    <!-- Next Nav -->
+    
+        <a href="/2020/06/15/Desgin-how-to-design-a-short-url/" id="post_nav-older" class="next-content">
+            Older
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            <button class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--icon mdl-color--white mdl-color-text--grey-900" role="presentation">
+                <i class="material-icons">arrow_forward</i>
+            </button>
+        </a>
+    
+</nav>
+
+        </div>
+    </div>
+
 
 
                     
