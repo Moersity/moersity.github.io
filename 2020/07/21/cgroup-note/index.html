@@ -48,7 +48,7 @@
     
     <title>
         
-            Tag: http | 
+            cgroup note | 
         
         Bigman
     </title>
@@ -220,7 +220,7 @@
     <!-- WebAPP Icons -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="application-name" content="Bigman">
-    <meta name="msapplication-starturl" content="https://moersity.github.io/tags/http/">
+    <meta name="msapplication-starturl" content="https://moersity.github.io/2020/07/21/cgroup-note/">
     <meta name="msapplication-navbutton-color" content="#0097A7">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Bigman">
@@ -235,13 +235,16 @@
     
 
     <!-- The Open Graph protocol -->
-    <meta property="og:url" content="https://moersity.github.io/tags/http/">
+    <meta property="og:url" content="https://moersity.github.io/2020/07/21/cgroup-note/">
     <meta property="og:type" content="blog">
-    <meta property="og:title" content="Tag: http | Bigman">
+    <meta property="og:title" content="cgroup note | Bigman">
     <meta property="og:image" content="/img/favicon.png">
     <meta property="og:description" content="">
     
 
+    
+        <meta property="article:published_time" content="Tue Jul 21 2020 19:45:38 GMT+0800">
+        <meta property="article:modified_time" content="Tue Jul 21 2020 19:46:31 GMT+0800">
     
 
     <!-- The Twitter Card protocol -->
@@ -249,13 +252,43 @@
 
     <!-- Add canonical link for SEO -->
     
-        <link rel="canonical" href="https://moersity.github.io/tags/http/index.html" />
+        <link rel="canonical" href="https://moersity.github.io/2020/07/21/cgroup-note/index.html" />
     
 
     <!-- Structured-data for SEO -->
     
         
 
+
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "mainEntityOfPage": "https://moersity.github.io/2020/07/21/cgroup-note/index.html",
+    "headline": "cgroup note",
+    "datePublished": "Tue Jul 21 2020 19:45:38 GMT+0800",
+    "dateModified": "Tue Jul 21 2020 19:46:31 GMT+0800",
+    "author": {
+        "@type": "Person",
+        "name": "Li Xiang",
+        "image": {
+            "@type": "ImageObject",
+            "url": "/img/avatar.png"
+        },
+        "description": "Most importantly, Have fun ..."
+    },
+    "publisher": {
+        "@type": "Organization",
+        "name": "Bigman",
+        "logo": {
+            "@type":"ImageObject",
+            "url": "/img/favicon.png"
+        }
+    },
+    "keywords": "",
+    "description": "",
+}
+</script>
 
 
     
@@ -290,93 +323,320 @@
                         </button>
                     
 
-                    <!-- Index Module -->
-<div class="material-index mdl-grid">
-    
-    <div class="locate-thumbnail-symbol"></div>
+                    <!-- Post TOC -->
 
-    <!-- Pin on top -->
+    
+    <!-- Back Button -->
+    <!--
+    <div class="material-back" id="backhome-div" tabindex="0">
+        <a class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--icon"
+           href="#" onclick="window.history.back();return false;"
+           target="_self"
+           role="button"
+           data-upgraded=",MaterialButton,MaterialRipple">
+            <i class="material-icons" role="presentation">arrow_back</i>
+            <span class="mdl-button__ripple-container">
+                <span class="mdl-ripple"></span>
+            </span>
+        </a>
+    </div>
+    -->
+
+
+    <!-- Left aligned menu below button -->
+    
+    
+    <button id="post-toc-trigger-btn"
+        class="mdl-button mdl-js-button mdl-button--icon">
+        <i class="material-icons">format_list_numbered</i>
+    </button>
+
+    <ul class="post-toc-wrap mdl-menu mdl-menu--bottom-left mdl-js-menu mdl-js-ripple-effect" for="post-toc-trigger-btn" style="max-height:80vh; overflow-y:scroll;">
+        <ol class="post-toc"><li class="post-toc-item post-toc-level-4"><a class="post-toc-link" href="#Control-Groups"><span class="post-toc-number">1.</span> <span class="post-toc-text">Control Groups</span></a></li><li class="post-toc-item post-toc-level-4"><a class="post-toc-link" href="#sub-system"><span class="post-toc-number">2.</span> <span class="post-toc-text">sub system:</span></a></li><li class="post-toc-item post-toc-level-4"><a class="post-toc-link" href="#memory"><span class="post-toc-number">3.</span> <span class="post-toc-text">memory:</span></a></li><li class="post-toc-item post-toc-level-4"><a class="post-toc-link" href="#CPU"><span class="post-toc-number">4.</span> <span class="post-toc-text">CPU</span></a></li><li class="post-toc-item post-toc-level-4"><a class="post-toc-link" href="#IO"><span class="post-toc-number">5.</span> <span class="post-toc-text">IO</span></a></li><li class="post-toc-item post-toc-level-4"><a class="post-toc-link" href="#Device"><span class="post-toc-number">6.</span> <span class="post-toc-text">Device</span></a></li></ol>
+    </ul>
     
 
-    <!-- Normal Post -->
-    
-        
-            
-                <!-- Paradox Thumbnail -->
-                <div class="post_entry-module mdl-card mdl-shadow--2dp mdl-cell mdl-cell--12-col fade out">
-    <!-- Post Thumbnail -->
+
+
+
+<!-- Layouts -->
+
+    <!-- Post Module -->
+    <div class="material-post_container">
+
+        <div class="material-post mdl-grid">
+            <div class="mdl-card mdl-shadow--4dp mdl-cell mdl-cell--12-col">
+
+                <!-- Post Header(Thumbnail & Title) -->
+                
+    <!-- Paradox Post Header -->
     
         
             <!-- Random Thumbnail -->
             <div class="post_thumbnail-random mdl-card__media mdl-color-text--grey-50">
-        
-    
+            <script type="text/ls-javascript" id="post-thumbnail-script">
+    var randomNum = Math.floor(Math.random() * 19 + 1);
 
-        <!-- Post Title -->
-        <p class="article-headline-p"><a href="/2020/06/16/Http-Code-3xx-which-to-use/">Http Code: 3xx, which to use</a></p>
-    </div>
-
-    <!-- Post Excerpt -->
-    <div class="mdl-color-text--grey-600 mdl-card__supporting-text post_entry-content">
-        
-            
-        
-        &nbsp;&nbsp;&nbsp;
-        <span>
-            <a href="/2020/06/16/Http-Code-3xx-which-to-use/" target="_self">Read more</a>
-        </span>
-    </div>
-    <!-- Post_entry Info-->
-    <div id="post_entry-info">
-        <div id="post_entry-left-info" class="mdl-card__supporting-text meta mdl-color-text--grey-600 ">
-            <!-- Author Avatar -->
-            <div id="author-avatar">
-                <img src="/img/avatar.png" width="44px" height="44px" alt="Li Xiang's avatar">
-            </div>
-            <div>
-                <strong>Li Xiang</strong>
-                <span>Jun 16, 2020</span>
-            </div>
-        </div>
-        <div id="post_entry-right-info">
-          
-
-            
-
-            
-
-            <!-- Post Views -->
-            <span class="post_entry-views">
-            </span>
-        </div>
-    </div>
-</div>
-
-            
-            
-        
-    
-
-    
-
-    
-        <script type="text/ls-javascript" id="thumbnail-script">
-    var randomNum;
-
-    var locatePost = $('.locate-thumbnail-symbol').next();
-    for(var i = 0; i < 10; i++) {
-        randomNum = Math.floor(Math.random() * 19 + 1);
-
-        locatePost.children('.post_thumbnail-random').attr('id', 'random_thumbnail-'+randomNum);
-        locatePost.children('.post_thumbnail-random').attr('data-original', '/img/random/material-' + randomNum + '.png');
+    $('.post_thumbnail-random').attr('data-original', '/img/random/material-' + randomNum + '.png');
     $('.post_thumbnail-random').addClass('lazy');
-
-        locatePost = locatePost.next();
-    }
 </script>
 
+        
+    
+            <p class="article-headline-p">
+                cgroup note
+            </p>
+        </div>
+
+
+
+
+
+                
+                    <!-- Paradox Post Info -->
+                    <div class="mdl-color-text--grey-700 mdl-card__supporting-text meta">
+
+    <!-- Author Avatar -->
+    <div id="author-avatar">
+        <img src="/img/avatar.png" width="44px" height="44px" alt="Author Avatar"/>
+    </div>
+    <!-- Author Name & Date -->
+    <div>
+        <strong>Li Xiang</strong>
+        <span>Jul 21, 2020</span>
+    </div>
+
+    <div class="section-spacer"></div>
+
+    <!-- Favorite -->
+    <!--
+        <button id="article-functions-like-button" class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--icon btn-like">
+            <i class="material-icons" role="presentation">favorite</i>
+            <span class="visuallyhidden">favorites</span>
+        </button>
+    -->
+
+    <!-- Qrcode -->
+    
+
+    <!-- Tags (bookmark) -->
+    
+
+    <!-- Share -->
+    
+        <button id="article-fuctions-share-button" class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--icon">
+    <i class="material-icons" role="presentation">share</i>
+    <span class="visuallyhidden">share</span>
+</button>
+<ul class="mdl-menu mdl-menu--bottom-right mdl-js-menu mdl-js-ripple-effect" for="article-fuctions-share-button">
+    
+
+    
+
+    <!-- Share Weibo -->
+    
+        <a class="post_share-link" href="http://service.weibo.com/share/share.php?appkey=&title=cgroup note&url=https://moersity.github.io/2020/07/21/cgroup-note/index.html&pic=https://moersity.github.io/img/favicon.png&searchPic=false&style=simple" target="_blank">
+            <li class="mdl-menu__item">
+                Share to Weibo
+            </li>
+        </a>
+    
+
+    <!-- Share Twitter -->
+    
+        <a class="post_share-link" href="https://twitter.com/intent/tweet?text=cgroup note&url=https://moersity.github.io/2020/07/21/cgroup-note/index.html&via=Li Xiang" target="_blank">
+            <li class="mdl-menu__item">
+                Share to Twitter
+            </li>
+        </a>
+    
+
+    <!-- Share Facebook -->
+    
+
+    <!-- Share Google+ -->
+    
+
+    <!-- Share LinkedIn -->
+    
+
+    <!-- Share QQ -->
+    
+
+    <!-- Share Telegram -->
+    
+</ul>
+
     
 </div>
+
+                
+
+                <!-- Post Content -->
+                <div id="post-content" class="mdl-color-text--grey-700 mdl-card__supporting-text fade out">
+    
+        <h4 id="Control-Groups"><a href="#Control-Groups" class="headerlink" title="Control Groups"></a>Control Groups</h4><blockquote>
+<p>cgoups 是linux内核提供的一种用来控制和限制多个进程所使用的资源的机制，可以对cpu,内存等资源进行更精细化的管理</p>
+</blockquote>
+<p>cgroups有多个子系统，用来描述各种资源，如cpu和内存，每个子系统是一个层级结构，是一个树状结构，每个子系统之间是独立的，</p>
+<p>每个进程存在每个子系统树中的某一个节点，每个结点里包含了多个进程.</p>
+<h4 id="sub-system"><a href="#sub-system" class="headerlink" title="sub system:"></a>sub system:</h4><figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">total 0</span><br><span class="line">dr-xr-xr-x 7 root root  0 Jul 21 19:40 blkio</span><br><span class="line">lrwxrwxrwx 1 root root 11 Jun 15 18:32 cpu -&gt; cpu,cpuacct</span><br><span class="line">lrwxrwxrwx 1 root root 11 Jun 15 18:32 cpuacct -&gt; cpu,cpuacct</span><br><span class="line">dr-xr-xr-x 7 root root  0 Jul 21 19:19 cpu,cpuacct</span><br><span class="line">dr-xr-xr-x 5 root root  0 Jun 16 15:56 cpuset</span><br><span class="line">dr-xr-xr-x 6 root root  0 Jul 21 15:56 devices</span><br><span class="line">dr-xr-xr-x 5 root root  0 Jun 16 15:56 freezer</span><br><span class="line">dr-xr-xr-x 5 root root  0 Jun 16 15:56 hugetlb</span><br><span class="line">dr-xr-xr-x 6 root root  0 Jul 21 15:56 memory</span><br><span class="line">lrwxrwxrwx 1 root root 16 Jun 15 18:32 net_cls -&gt; net_cls,net_prio</span><br><span class="line">dr-xr-xr-x 5 root root  0 Jun 16 15:56 net_cls,net_prio</span><br><span class="line">lrwxrwxrwx 1 root root 16 Jun 15 18:32 net_prio -&gt; net_cls,net_prio</span><br><span class="line">dr-xr-xr-x 5 root root  0 Jun 16 15:56 perf_event</span><br><span class="line">dr-xr-xr-x 5 root root  0 Jun 16 15:56 pids</span><br><span class="line">dr-xr-xr-x 6 root root  0 Jul 21 15:56 systemd</span><br></pre></td></tr></table></figure>
+
+
+
+<h4 id="memory"><a href="#memory" class="headerlink" title="memory:"></a>memory:</h4><ol>
+<li><p>accounting    </p>
+<ol>
+<li><p>Keep track of pages used by each group</p>
+</li>
+<li><p>each page is charged to a group</p>
+</li>
+<li><p>page can be shared across multiple groups</p>
+<p>mutiple process reading from same files when pages are shared, only one group ‘pay’ for a page</p>
+</li>
+</ol>
+</li>
+<li><p>limit</p>
+<ol>
+<li>each group can have its own limit</li>
+<li>soft limit are not enforced</li>
+<li>hard limit will trigger a per group oom killer</li>
+<li>limit can be set to different kinds of memeory<ol>
+<li>physical memroy</li>
+<li>kernel memroy </li>
+<li>total memroy </li>
+</ol>
+</li>
+</ol>
+</li>
+<li><p>avoiding oom killer</p>
+<ol>
+<li>setup oom notifier</li>
+<li>then when the hard limit is exceeded:<ol>
+<li>freeze all process in the group</li>
+<li>notify user space(insted of going rampage)</li>
+<li>we can kill process, raise limit, migrate contailer</li>
+<li>unfreeze the group</li>
+</ol>
+</li>
+</ol>
+</li>
+<li><p>tricky detail</p>
+<ol>
+<li>each time a kernal give a page to a process, or take it away, it update the counter</li>
+<li>this adds some overhead</li>
+<li>this can’t be enabled/disabled per process, it has to be done at boot time</li>
+<li>when multiple groups use the same page,  only the first one is charged</li>
+</ol>
+</li>
+</ol>
+<h4 id="CPU"><a href="#CPU" class="headerlink" title="CPU"></a>CPU</h4><p>Cputset, cpuacct, cpu</p>
+<p>Cpu.cfs.period_us 时间周期长度，取值为1ms到1s</p>
+<p>cpu.cfs.quata_us 在时间周期长度内能使用的cpu时间数，大于1ms, 默认值为-1</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">echo</span> 20000 &gt; cpu.cfs_period_us</span><br><span class="line"><span class="built_in">echo</span> 10000 &gt; cpu.cfs_quota_us</span><br><span class="line"><span class="comment"># 表示只能使用一半的时间</span></span><br></pre></td></tr></table></figure>
+
+
+
+<ol>
+<li>keep track of user/system cpu time</li>
+<li>keep track of usage per cpu</li>
+<li>allow to set weights</li>
+<li>can’t set cpu limit</li>
+</ol>
+<h4 id="IO"><a href="#IO" class="headerlink" title="IO"></a>IO</h4><ol>
+<li>keep track of i/os for each group</li>
+<li>set throttle(limit) for each group</li>
+<li>set relative weights fro each group</li>
+</ol>
+<p>most write go through the page cache, so classic write will appear to be unthrottled at first</p>
+<h4 id="Device"><a href="#Device" class="headerlink" title="Device"></a>Device</h4><ol>
+<li><p>Control what the group can do on device nodes</p>
+</li>
+<li><p>Permissions include read/write/mknod</p>
+</li>
+<li><p>Typical use:</p>
+<ol>
+<li>allow /dev{tty, zero, random, null}…</li>
+<li>deny everything else</li>
+</ol>
+</li>
+<li><p>A few interesting nodes:</p>
+<ol>
+<li>/dev/net/tun, network interface manipulation</li>
+<li>/dev/fuse, filesystem in user space</li>
+<li>/dev/kvm, vms in container</li>
+<li>/dev/dri, GPU</li>
+</ol>
+</li>
+</ol>
+
+        
+    
+
+    
+</div>
+
+
+                
+
+                <!-- Post Comments -->
+                
+                    
+    <!-- 使用 DISQUS -->
+<div id="disqus-comment">
+    <div id="disqus_thread"></div>
+<script type="text/javascript">
+    var disqus_config = function () {
+        this.page.url = 'https://moersity.github.io/2020/07/21/cgroup-note/';  // Replace PAGE_URL with your page's canonical URL variable
+        this.page.identifier = 'https://moersity.github.io/2020/07/21/cgroup-note/'; // Replace PAGE_IDENTIFIER with your page's unique identifier variable
+    };
+</script>
+<script type="text/ls-javascript" id="disqus-thread-script">
+    queue.offer(function() {
+            (function() { // DON'T EDIT BELOW THIS LINE
+                var d = document;
+                var s = d.createElement('script');
+                s.src = '//moersity.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', + new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        });
+</script>
+
+</div>
+<style>
+    #disqus-comment{
+        background-color: #eee;
+        padding: 2pc;
+    }
+</style>
+
+                
+            </div>
+
+            <!-- Post Prev & Next Nav -->
+            <nav class="material-nav mdl-color-text--grey-50 mdl-cell mdl-cell--12-col">
+    <!-- Prev Nav -->
+    
+
+    <!-- Section Spacer -->
+    <div class="section-spacer"></div>
+
+    <!-- Next Nav -->
+    
+        <a href="/2020/07/13/Protobuf/" id="post_nav-older" class="next-content">
+            Older
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            <button class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--icon mdl-color--white mdl-color-text--grey-900" role="presentation">
+                <i class="material-icons">arrow_forward</i>
+            </button>
+        </a>
+    
+</nav>
+
+        </div>
+    </div>
+
 
 
                     
@@ -548,6 +808,14 @@ It will not impact the appearance and can give developers a lot of support :)
 </aside>
 
                     
+
+                    
+                        <!-- Footer Top Button -->
+                        <div id="back-to-top" class="toTop-wrap">
+    <a href="#top" class="toTop">
+        <i class="material-icons footer_top-i">expand_less</i>
+    </a>
+</div>
 
                     
 

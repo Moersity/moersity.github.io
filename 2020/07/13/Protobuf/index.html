@@ -48,7 +48,7 @@
     
     <title>
         
-            Tag: http | 
+            Protobuf | 
         
         Bigman
     </title>
@@ -220,7 +220,7 @@
     <!-- WebAPP Icons -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="application-name" content="Bigman">
-    <meta name="msapplication-starturl" content="https://moersity.github.io/tags/http/">
+    <meta name="msapplication-starturl" content="https://moersity.github.io/2020/07/13/Protobuf/">
     <meta name="msapplication-navbutton-color" content="#0097A7">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Bigman">
@@ -235,13 +235,16 @@
     
 
     <!-- The Open Graph protocol -->
-    <meta property="og:url" content="https://moersity.github.io/tags/http/">
+    <meta property="og:url" content="https://moersity.github.io/2020/07/13/Protobuf/">
     <meta property="og:type" content="blog">
-    <meta property="og:title" content="Tag: http | Bigman">
+    <meta property="og:title" content="Protobuf | Bigman">
     <meta property="og:image" content="/img/favicon.png">
     <meta property="og:description" content="">
     
 
+    
+        <meta property="article:published_time" content="Mon Jul 13 2020 11:04:38 GMT+0800">
+        <meta property="article:modified_time" content="Mon Jul 13 2020 11:04:38 GMT+0800">
     
 
     <!-- The Twitter Card protocol -->
@@ -249,13 +252,43 @@
 
     <!-- Add canonical link for SEO -->
     
-        <link rel="canonical" href="https://moersity.github.io/tags/http/index.html" />
+        <link rel="canonical" href="https://moersity.github.io/2020/07/13/Protobuf/index.html" />
     
 
     <!-- Structured-data for SEO -->
     
         
 
+
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "mainEntityOfPage": "https://moersity.github.io/2020/07/13/Protobuf/index.html",
+    "headline": "Protobuf",
+    "datePublished": "Mon Jul 13 2020 11:04:38 GMT+0800",
+    "dateModified": "Mon Jul 13 2020 11:04:38 GMT+0800",
+    "author": {
+        "@type": "Person",
+        "name": "Li Xiang",
+        "image": {
+            "@type": "ImageObject",
+            "url": "/img/avatar.png"
+        },
+        "description": "Most importantly, Have fun ..."
+    },
+    "publisher": {
+        "@type": "Organization",
+        "name": "Bigman",
+        "logo": {
+            "@type":"ImageObject",
+            "url": "/img/favicon.png"
+        }
+    },
+    "keywords": "",
+    "description": "",
+}
+</script>
 
 
     
@@ -290,93 +323,286 @@
                         </button>
                     
 
-                    <!-- Index Module -->
-<div class="material-index mdl-grid">
-    
-    <div class="locate-thumbnail-symbol"></div>
+                    <!-- Post TOC -->
 
-    <!-- Pin on top -->
+    
+    <!-- Back Button -->
+    <!--
+    <div class="material-back" id="backhome-div" tabindex="0">
+        <a class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--icon"
+           href="#" onclick="window.history.back();return false;"
+           target="_self"
+           role="button"
+           data-upgraded=",MaterialButton,MaterialRipple">
+            <i class="material-icons" role="presentation">arrow_back</i>
+            <span class="mdl-button__ripple-container">
+                <span class="mdl-ripple"></span>
+            </span>
+        </a>
+    </div>
+    -->
+
+
+    <!-- Left aligned menu below button -->
+    
+    
+    <button id="post-toc-trigger-btn"
+        class="mdl-button mdl-js-button mdl-button--icon">
+        <i class="material-icons">format_list_numbered</i>
+    </button>
+
+    <ul class="post-toc-wrap mdl-menu mdl-menu--bottom-left mdl-js-menu mdl-js-ripple-effect" for="post-toc-trigger-btn" style="max-height:80vh; overflow-y:scroll;">
+        <ol class="post-toc"><li class="post-toc-item post-toc-level-3"><a class="post-toc-link" href="#Protobuf"><span class="post-toc-number">1.</span> <span class="post-toc-text">Protobuf</span></a></li><li class="post-toc-item post-toc-level-3"><a class="post-toc-link" href="#Grpc"><span class="post-toc-number">2.</span> <span class="post-toc-text">Grpc</span></a><ol class="post-toc-child"><li class="post-toc-item post-toc-level-4"><a class="post-toc-link" href="#Grpc-gateway"><span class="post-toc-number">2.1.</span> <span class="post-toc-text">Grpc-gateway</span></a></li></ol></li></ol>
+    </ul>
     
 
-    <!-- Normal Post -->
-    
-        
-            
-                <!-- Paradox Thumbnail -->
-                <div class="post_entry-module mdl-card mdl-shadow--2dp mdl-cell mdl-cell--12-col fade out">
-    <!-- Post Thumbnail -->
+
+
+
+<!-- Layouts -->
+
+    <!-- Post Module -->
+    <div class="material-post_container">
+
+        <div class="material-post mdl-grid">
+            <div class="mdl-card mdl-shadow--4dp mdl-cell mdl-cell--12-col">
+
+                <!-- Post Header(Thumbnail & Title) -->
+                
+    <!-- Paradox Post Header -->
     
         
             <!-- Random Thumbnail -->
             <div class="post_thumbnail-random mdl-card__media mdl-color-text--grey-50">
-        
-    
+            <script type="text/ls-javascript" id="post-thumbnail-script">
+    var randomNum = Math.floor(Math.random() * 19 + 1);
 
-        <!-- Post Title -->
-        <p class="article-headline-p"><a href="/2020/06/16/Http-Code-3xx-which-to-use/">Http Code: 3xx, which to use</a></p>
-    </div>
-
-    <!-- Post Excerpt -->
-    <div class="mdl-color-text--grey-600 mdl-card__supporting-text post_entry-content">
-        
-            
-        
-        &nbsp;&nbsp;&nbsp;
-        <span>
-            <a href="/2020/06/16/Http-Code-3xx-which-to-use/" target="_self">Read more</a>
-        </span>
-    </div>
-    <!-- Post_entry Info-->
-    <div id="post_entry-info">
-        <div id="post_entry-left-info" class="mdl-card__supporting-text meta mdl-color-text--grey-600 ">
-            <!-- Author Avatar -->
-            <div id="author-avatar">
-                <img src="/img/avatar.png" width="44px" height="44px" alt="Li Xiang's avatar">
-            </div>
-            <div>
-                <strong>Li Xiang</strong>
-                <span>Jun 16, 2020</span>
-            </div>
-        </div>
-        <div id="post_entry-right-info">
-          
-
-            
-
-            
-
-            <!-- Post Views -->
-            <span class="post_entry-views">
-            </span>
-        </div>
-    </div>
-</div>
-
-            
-            
-        
-    
-
-    
-
-    
-        <script type="text/ls-javascript" id="thumbnail-script">
-    var randomNum;
-
-    var locatePost = $('.locate-thumbnail-symbol').next();
-    for(var i = 0; i < 10; i++) {
-        randomNum = Math.floor(Math.random() * 19 + 1);
-
-        locatePost.children('.post_thumbnail-random').attr('id', 'random_thumbnail-'+randomNum);
-        locatePost.children('.post_thumbnail-random').attr('data-original', '/img/random/material-' + randomNum + '.png');
+    $('.post_thumbnail-random').attr('data-original', '/img/random/material-' + randomNum + '.png');
     $('.post_thumbnail-random').addClass('lazy');
-
-        locatePost = locatePost.next();
-    }
 </script>
 
+        
+    
+            <p class="article-headline-p">
+                Protobuf
+            </p>
+        </div>
+
+
+
+
+
+                
+                    <!-- Paradox Post Info -->
+                    <div class="mdl-color-text--grey-700 mdl-card__supporting-text meta">
+
+    <!-- Author Avatar -->
+    <div id="author-avatar">
+        <img src="/img/avatar.png" width="44px" height="44px" alt="Author Avatar"/>
+    </div>
+    <!-- Author Name & Date -->
+    <div>
+        <strong>Li Xiang</strong>
+        <span>Jul 13, 2020</span>
+    </div>
+
+    <div class="section-spacer"></div>
+
+    <!-- Favorite -->
+    <!--
+        <button id="article-functions-like-button" class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--icon btn-like">
+            <i class="material-icons" role="presentation">favorite</i>
+            <span class="visuallyhidden">favorites</span>
+        </button>
+    -->
+
+    <!-- Qrcode -->
+    
+
+    <!-- Tags (bookmark) -->
+    
+
+    <!-- Share -->
+    
+        <button id="article-fuctions-share-button" class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--icon">
+    <i class="material-icons" role="presentation">share</i>
+    <span class="visuallyhidden">share</span>
+</button>
+<ul class="mdl-menu mdl-menu--bottom-right mdl-js-menu mdl-js-ripple-effect" for="article-fuctions-share-button">
+    
+
+    
+
+    <!-- Share Weibo -->
+    
+        <a class="post_share-link" href="http://service.weibo.com/share/share.php?appkey=&title=Protobuf&url=https://moersity.github.io/2020/07/13/Protobuf/index.html&pic=https://moersity.github.io/img/favicon.png&searchPic=false&style=simple" target="_blank">
+            <li class="mdl-menu__item">
+                Share to Weibo
+            </li>
+        </a>
+    
+
+    <!-- Share Twitter -->
+    
+        <a class="post_share-link" href="https://twitter.com/intent/tweet?text=Protobuf&url=https://moersity.github.io/2020/07/13/Protobuf/index.html&via=Li Xiang" target="_blank">
+            <li class="mdl-menu__item">
+                Share to Twitter
+            </li>
+        </a>
+    
+
+    <!-- Share Facebook -->
+    
+
+    <!-- Share Google+ -->
+    
+
+    <!-- Share LinkedIn -->
+    
+
+    <!-- Share QQ -->
+    
+
+    <!-- Share Telegram -->
+    
+</ul>
+
     
 </div>
+
+                
+
+                <!-- Post Content -->
+                <div id="post-content" class="mdl-color-text--grey-700 mdl-card__supporting-text fade out">
+    
+        <p><a href="https://github.com/protocolbuffers/protobuf/blob/master/src/google/protobuf/descriptor.proto" target="_blank" rel="noopener">https://github.com/protocolbuffers/protobuf/blob/master/src/google/protobuf/descriptor.proto</a></p>
+<p><a href="https://grpc.io/" target="_blank" rel="noopener">https://grpc.io/</a></p>
+<p><a href="https://www.youtube.com/watch?v=dDr-8kbMnaw" target="_blank" rel="noopener">https://www.youtube.com/watch?v=dDr-8kbMnaw</a></p>
+<h3 id="Protobuf"><a href="#Protobuf" class="headerlink" title="Protobuf"></a>Protobuf</h3><blockquote>
+<p>language-neutral, platform-neutral, extensible mechanism for serializing structured data </p>
+</blockquote>
+<ol>
+<li>Interface definition Language (ADL) <ol>
+<li>Declare data structure, .proto file</li>
+</ol>
+</li>
+<li>Code Gen tools, protoc compiler<ol>
+<li>generate descriptors file</li>
+<li>generate language code, by plugin</li>
+</ol>
+</li>
+<li>Runtime library for program language you choice<ol>
+<li>Serialization / Deserialization</li>
+<li>mapping to json format</li>
+<li>…</li>
+</ol>
+</li>
+</ol>
+<h3 id="Grpc"><a href="#Grpc" class="headerlink" title="Grpc"></a>Grpc</h3><blockquote>
+<p>A high-performance, open source universal RPC framework</p>
+</blockquote>
+<ol>
+<li>Specification of remote procedure call<ol>
+<li>Protocol specification build on top of http2.0. describe how procudure call map to http protocal</li>
+<li>specific lifecycle of rpc, cancellation…</li>
+<li>Error code, client/server</li>
+</ol>
+</li>
+<li>Code Gen tools<ol>
+<li>it’s a protoc plugin, compile protobuffer to client stub and server interface</li>
+</ol>
+</li>
+<li>Runtime library for program language you choice<ol>
+<li>client-server machinery, transport protocol </li>
+<li>persist connection</li>
+<li>pluggable for service discovery, load balancing, tracing, health checking, authentication</li>
+</ol>
+</li>
+</ol>
+<h4 id="Grpc-gateway"><a href="#Grpc-gateway" class="headerlink" title="Grpc-gateway"></a>Grpc-gateway</h4><blockquote>
+<p>reverse-proxy server which translates a RESTful HTTP API into gRPC</p>
+</blockquote>
+<ol>
+<li>Convert json message to proto meesage</li>
+<li>Generate Code, http handler, register method,</li>
+<li>No runtime library</li>
+</ol>
+
+        
+    
+
+    
+</div>
+
+
+                
+
+                <!-- Post Comments -->
+                
+                    
+    <!-- 使用 DISQUS -->
+<div id="disqus-comment">
+    <div id="disqus_thread"></div>
+<script type="text/javascript">
+    var disqus_config = function () {
+        this.page.url = 'https://moersity.github.io/2020/07/13/Protobuf/';  // Replace PAGE_URL with your page's canonical URL variable
+        this.page.identifier = 'https://moersity.github.io/2020/07/13/Protobuf/'; // Replace PAGE_IDENTIFIER with your page's unique identifier variable
+    };
+</script>
+<script type="text/ls-javascript" id="disqus-thread-script">
+    queue.offer(function() {
+            (function() { // DON'T EDIT BELOW THIS LINE
+                var d = document;
+                var s = d.createElement('script');
+                s.src = '//moersity.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', + new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        });
+</script>
+
+</div>
+<style>
+    #disqus-comment{
+        background-color: #eee;
+        padding: 2pc;
+    }
+</style>
+
+                
+            </div>
+
+            <!-- Post Prev & Next Nav -->
+            <nav class="material-nav mdl-color-text--grey-50 mdl-cell mdl-cell--12-col">
+    <!-- Prev Nav -->
+    
+        <a href="/2020/07/21/cgroup-note/" id="post_nav-newer" class="prev-content">
+            <button class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--icon mdl-color--white mdl-color-text--grey-900" role="presentation">
+                <i class="material-icons">arrow_back</i>
+            </button>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            Newer
+        </a>
+    
+
+    <!-- Section Spacer -->
+    <div class="section-spacer"></div>
+
+    <!-- Next Nav -->
+    
+        <a href="/2020/06/16/Http-Code-3xx-which-to-use/" id="post_nav-older" class="next-content">
+            Older
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            <button class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--icon mdl-color--white mdl-color-text--grey-900" role="presentation">
+                <i class="material-icons">arrow_forward</i>
+            </button>
+        </a>
+    
+</nav>
+
+        </div>
+    </div>
+
 
 
                     
@@ -548,6 +774,14 @@ It will not impact the appearance and can give developers a lot of support :)
 </aside>
 
                     
+
+                    
+                        <!-- Footer Top Button -->
+                        <div id="back-to-top" class="toTop-wrap">
+    <a href="#top" class="toTop">
+        <i class="material-icons footer_top-i">expand_less</i>
+    </a>
+</div>
 
                     
 
