@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="https://moersity.github.io/"/>
-  <updated>2020-07-21T11:46:31.036Z</updated>
+  <updated>2020-07-30T09:13:19.174Z</updated>
   <id>https://moersity.github.io/</id>
   
   <author>
@@ -15,6 +15,32 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>descripe a program language</title>
+    <link href="https://moersity.github.io/2020/07/30/descripe-a-program-language/"/>
+    <id>https://moersity.github.io/2020/07/30/descripe-a-program-language/</id>
+    <published>2020-07-30T08:03:46.000Z</published>
+    <updated>2020-07-30T09:13:19.174Z</updated>
+    
+    <content type="html"><![CDATA[<p>最近在学习c++和汇编, 迄今为此接触的计算机语言也非常多了，ruby/python/java/scala/golang/lua/c, <strong>emmm,</strong> 感觉技能点点错了，关于计算机编程语言，有了一些思考和想法，恰好又看到了c++官网关于编程语言的描述，在这里做一下翻译和分享吧。</p><p>计算机语言可以通过以下几个分类来认识：</p><h4 id="编译型，解释性，JIT"><a href="#编译型，解释性，JIT" class="headerlink" title="编译型，解释性，JIT"></a>编译型，解释性，JIT</h4><ol><li>编译型指的是编写的代码，会通过编译器直接编译成机器码，这样产生的机器码执行会特别的高，但是有缺陷就是跟硬件绑定太多了，可移植性收到了破坏，一些指令只有在特定的硬件上才会有，如果想要不同的平台都执行，那就需要在每个平台都编译一次，其次是编译会有时间，尤其是大型项目，编译可能就会上几个小时</li><li>解释性指的是通过编写脚本类似的文本，通过解释执行器执行代码，这样的好处是编写的脚本一般语法比较高级，语法糖比较多，开发效率高，并且跟机器硬件相关的部分都由执行器解决了，所以一般都是移植性非常好的，坏处就是执行效率会变低</li><li>JIT just in time: 指的是一种泽中方案，一些语言实现了jit，将一些频繁执行的语句进行了编译，这样就会提高运行的效率，常见的有luajit, jvm jit</li></ol><h4 id="高级还是低级语言"><a href="#高级还是低级语言" class="headerlink" title="高级还是低级语言"></a>高级还是低级语言</h4><p>高级和低级指的是语言对于机器具体执行过程的相似度，</p><p>低级语言更接近于机器码，如汇编，更适合做驱动编程和需要高性能的场景</p><p>高级语言更接近于人的语言，能高效率的开发</p><h4 id="类型系统"><a href="#类型系统" class="headerlink" title="类型系统"></a>类型系统</h4><p>类型系统指的是一门编程语言对于变量类型的规则，一些语言没有类型系统，如汇编，但是大多数语言都是有类型系统的</p><h5 id="强类型或者弱类型："><a href="#强类型或者弱类型：" class="headerlink" title="强类型或者弱类型："></a>强类型或者弱类型：</h5><p>强类型限制了语言中的不同变量类型的相互转换，理想的强类型会限制implict cast 到另外一个类型，如int转换到水果，而弱类型会想办法去进行转换</p><h5 id="定义还是推断"><a href="#定义还是推断" class="headerlink" title="定义还是推断"></a>定义还是推断</h5><p>一些语言需要在声明的时候强制指定变量的类型，一些语言可以通过推断来识别变量的类型，</p><h5 id="编译时检查还是运行时检查"><a href="#编译时检查还是运行时检查" class="headerlink" title="编译时检查还是运行时检查"></a>编译时检查还是运行时检查</h5><p>一些语言在编译的时候会检查你的类型是否正确，在没执行程序的时候就可以发现问题，一些语言需要在运行时才能做类型检查</p><h5 id="安全还是不安全"><a href="#安全还是不安全" class="headerlink" title="安全还是不安全"></a>安全还是不安全</h5><p>一些语言会禁止你做一些可能参数未定义结果或者错误的行为，一些语言会放开这个限制</p><p>这几个属性并不是互斥的，一些语言融合了这几种特性</p><h4 id="范式"><a href="#范式" class="headerlink" title="范式"></a>范式</h4><p>语言的范式指的是一种编程的方法论或者方法，不同的语言支持不同的范式，有下面几种范式</p><ul><li>陈述式</li><li>函数式</li><li>范型</li><li>指示型</li><li>结构化</li><li>面向过程</li><li>面向对象</li></ul>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;最近在学习c++和汇编, 迄今为此接触的计算机语言也非常多了，ruby/python/java/scala/golang/lua/c, &lt;strong&gt;emmm,&lt;/strong&gt; 感觉技能点点错了，关于计算机编程语言，有了一些思考和想法，恰好又看到了c++官网关于编程语言
+      
+    
+    </summary>
+    
+    
+    
+      <category term="闲谈" scheme="https://moersity.github.io/tags/%E9%97%B2%E8%B0%88/"/>
+    
+      <category term="编程" scheme="https://moersity.github.io/tags/%E7%BC%96%E7%A8%8B/"/>
+    
+  </entry>
   
   <entry>
     <title>cgroup note</title>
