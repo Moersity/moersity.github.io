@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact — Moersity</title>
+    <link rel="stylesheet" href="css/common.css">
+    <link rel="stylesheet" href="css/contact.css">
+</head>
+<body>
+
+<nav>
+    <a class="nav-logo" href="index.html">Moersity</a>
+    <div class="nav-links">
+        <a href="index.html">首页</a>
+        <a href="about.html">About Me</a>
+    </div>
+</nav>
+
+<!-- Hero -->
+<div class="contact-hero">
+    <div class="contact-hero-bg"></div>
+    <div class="contact-hero-content">
+        <h1>联系我 ✉️</h1>
+        <p class="subtitle">
+            无论是技术交流、项目合作，还是只想打个招呼，<br>
+            都欢迎随时联系我。
+        </p>
+    </div>
+</div>
+
+<!-- Contact Info -->
+<section class="contact-section fade-up">
+    <div class="contact-grid">
+        <div class="contact-card">
+            <span class="card-icon">📧</span>
+            <h3>邮箱</h3>
+            <p><a href="mailto:lixiang0417.cq@gmail.com">lixiang0417.cq@gmail.com</a></p>
+        </div>
+        <div class="contact-card">
+            <span class="card-icon">🐙</span>
+            <h3>GitHub</h3>
+            <p><a href="https://github.com/Moersity" target="_blank">github.com/Moersity</a></p>
+        </div>
+        <div class="contact-card">
+            <span class="card-icon">📍</span>
+            <h3>所在地</h3>
+            <p>中国</p>
+        </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="contact-cta">
+        <h2>有想法？聊聊吧</h2>
+        <p>
+            我对云原生、微服务、AI 基础设施方面的讨论尤其感兴趣。<br>
+            开源协作、技术分享也非常欢迎。
+        </p>
+        <a href="mailto:lixiang0417.cq@gmail.com" class="btn-email">
+            ✉️ 发送邮件
+        </a>
+        <span class="email-plain">lixiang0417.cq@gmail.com</span>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer>
+    <div class="socials">
+        <a href="https://github.com/Moersity" target="_blank">GitHub</a>
+        <a href="mailto:lixiang0417.cq@gmail.com">Email</a>
+    </div>
+    <p>&copy; 2026 Moersity — Built with ❤️</p>
+</footer>
+
+<script>
+    const observer = new IntersectionObserver(
+        entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); }),
+        { threshold: 0.15 }
+    );
+    document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>
