@@ -1,39 +1,184 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>moersity.github.io</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #fff;
-        }
-        .container {
-            text-align: center;
-            padding: 2rem;
-        }
-        h1 {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            letter-spacing: -0.02em;
-        }
-        p {
-            font-size: 1.25rem;
-            opacity: 0.85;
-        }
-    </style>
+    <title>Moersity — Backend Engineer · AI · Cloud Native</title>
+    <link rel="stylesheet" href="css/common.css">
+    <link rel="stylesheet" href="css/index.css">
 </head>
 <body>
-    <div class="container">
-        <h1>moersity.github.io</h1>
-        <p>Welcome — the site is live.</p>
+
+<!-- Navigation -->
+<nav>
+    <a class="nav-logo" href="#">Moersity</a>
+    <div class="nav-links">
+        <a href="#stack">技术栈</a>
+        <a href="#interests">兴趣</a>
+        <a href="about.html" class="btn-about">About Me</a>
     </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-grid"></div>
+    <div class="hero-content">
+        <div class="hero-badge">
+            <span class="dot"></span>
+            专注 AI 基础设施与云原生后端
+        </div>
+        <h1>
+            用 Go 构建<br>
+            <span class="gradient">智能化云原生系统</span>
+        </h1>
+        <p class="hero-desc">
+            后端工程师，深耕 Golang 微服务与云原生架构。<br>
+            在 AI 浪潮中打造高性能、高可用的基础设施。
+        </p>
+        <div class="hero-cta">
+            <a href="about.html" class="cta-primary">了解更多</a>
+            <a href="#interests" class="cta-secondary">探索我的世界 ↓</a>
+        </div>
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-value">Go</div>
+                <div class="stat-label">主力语言</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">AI</div>
+                <div class="stat-label">工作领域</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">K8s</div>
+                <div class="stat-label">云原生运行时</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<hr class="divider">
+
+<!-- Tech Stack -->
+<section class="section fade-up" id="stack">
+    <div class="section-header">
+        <div class="section-label">What I Build With</div>
+        <h2 class="section-title">技术栈</h2>
+    </div>
+    <div class="stack-grid">
+        <div class="stack-card">
+            <div class="stack-icon">🐹</div>
+            <h3>Golang 后端</h3>
+            <p>高并发服务、gRPC / HTTP API、领域驱动设计</p>
+            <div class="stack-tags">
+                <span class="tag">Go</span>
+                <span class="tag">gRPC</span>
+                <span class="tag">Gin</span>
+                <span class="tag">Wire</span>
+            </div>
+        </div>
+        <div class="stack-card">
+            <div class="stack-icon">🔩</div>
+            <h3>微服务架构</h3>
+            <p>服务拆分、服务网格、分布式追踪、可观测性</p>
+            <div class="stack-tags">
+                <span class="tag">Istio</span>
+                <span class="tag">Envoy</span>
+                <span class="tag">OpenTelemetry</span>
+            </div>
+        </div>
+        <div class="stack-card">
+            <div class="stack-icon">☁️</div>
+            <h3>云原生 & DevOps</h3>
+            <p>容器编排、GitOps、基础设施即代码</p>
+            <div class="stack-tags">
+                <span class="tag">Kubernetes</span>
+                <span class="tag">Docker</span>
+                <span class="tag">Helm</span>
+                <span class="tag">Terraform</span>
+            </div>
+        </div>
+        <div class="stack-card">
+            <div class="stack-icon">🤖</div>
+            <h3>AI 基础设施</h3>
+            <p>模型服务、推理引擎、向量数据库、AI 工作流编排</p>
+            <div class="stack-tags">
+                <span class="tag">LLM Serving</span>
+                <span class="tag">RAG</span>
+                <span class="tag">MLOps</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<hr class="divider">
+
+<!-- Interests — Bento Grid -->
+<section class="section fade-up" id="interests">
+    <div class="section-header">
+        <div class="section-label">Beyond Code</div>
+        <h2 class="section-title">工作之外的世界</h2>
+    </div>
+    <div class="bento">
+        <div class="bento-item b-skiing">
+            <img src="https://images.unsplash.com/photo-1551524559-8af4e6624178?w=1200&q=80"
+                 alt="滑雪" loading="lazy">
+            <div class="bento-overlay">
+                <h3>🎿 滑雪</h3>
+                <p>粉雪、蓝天、风从耳边呼啸——没有什么比在雪道上飞驰更自由的了</p>
+            </div>
+        </div>
+        <div class="bento-item b-movies">
+            <img src="https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1200&q=80"
+                 alt="电影" loading="lazy">
+            <div class="bento-overlay">
+                <h3>🎬 电影</h3>
+                <p>诺兰的烧脑、是枝裕和的细腻，沉浸在光影故事中</p>
+            </div>
+        </div>
+        <div class="bento-item b-gaming">
+            <img src="https://images.unsplash.com/photo-1542751371-adc38448a05e?w=1200&q=80"
+                 alt="魂类游戏" loading="lazy">
+            <div class="bento-overlay">
+                <h3>⚔️ 魂类游戏</h3>
+                <p>YOU DIED 是通往胜利的唯一路径。Elden Ring · Sekiro · Dark Souls</p>
+            </div>
+        </div>
+        <div class="bento-item b-code">
+            <img src="https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=1200&q=80"
+                 alt="编程" loading="lazy">
+            <div class="bento-overlay">
+                <h3>💻 Open Source</h3>
+                <p>相信开源的力量，业余时间也在持续贡献和学习</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Quote -->
+<section class="quote-section fade-up">
+    <p class="quote-text">
+        好的系统和好的人生一样，<br>
+        都需要耐心、热情，和持续的重构。
+    </p>
+    <p class="quote-attr">— 写在某个深夜 debug 之后</p>
+</section>
+
+<!-- Footer -->
+<footer>
+    <div class="socials">
+        <a href="https://github.com/Moersity" target="_blank">GitHub</a>
+    </div>
+    <p>&copy; 2026 Moersity — Built with ❤️ &amp; ☕</p>
+</footer>
+
+<script>
+    const observer = new IntersectionObserver(
+        entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); }),
+        { threshold: 0.15 }
+    );
+    document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+</script>
+
 </body>
 </html>
