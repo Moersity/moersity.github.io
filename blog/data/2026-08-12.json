@@ -1,0 +1,151 @@
+{
+  "date": "2026-08-12",
+  "title": "大版本之后，生产升级先看回归门禁",
+  "deck": "vLLM 0.27.1 紧随大版本发布，SGLang 继续交付全栈模型路径；生产评估应把正确性、冷启动和尾延迟与吞吐并列。",
+  "top_items": [
+    {
+      "title": "vLLM 发布 v0.27.1 小型补丁",
+      "summary": "v0.27.1 紧随 0.27.0，增加量化 DSpark Markov heads 支持；0.27.0 则完成 Kimi K3 从模型、Kernel 到 Python/Rust 前端的全栈落地。",
+      "judgment": "大版本后立即出现补丁，生产升级应等待冒烟、目标模型和量化路径回归。",
+      "sources": [
+        {
+          "name": "vLLM v0.27.1",
+          "url": "https://github.com/vllm-project/vllm/releases/tag/v0.27.1"
+        },
+        {
+          "name": "vLLM v0.27.0",
+          "url": "https://github.com/vllm-project/vllm/releases/tag/v0.27.0"
+        }
+      ]
+    },
+    {
+      "title": "SGLang v0.5.17 交付 Kimi K3 day-0 serving",
+      "summary": "版本覆盖 DCP、DSpark、KDA-aware Prefix Cache、HiCache L2、LoRA 以及 NVIDIA/AMD 路径。",
+      "judgment": "模型支持的竞争单位已是从算子、缓存到前端和硬件后端的完整链路。",
+      "sources": [
+        {
+          "name": "SGLang v0.5.17",
+          "url": "https://github.com/sgl-project/sglang/releases/tag/v0.5.17"
+        }
+      ]
+    },
+    {
+      "title": "Kubernetes v1.37.0-rc.0 仅适合测试",
+      "summary": "1.37 rc0 是预发布版本，GPU 推理集群需要先验证 Device Plugin、Gateway、Kueue 和 RDMA/NCCL 兼容性。",
+      "judgment": "可用于隔离环境兼容测试，不应直接升级生产。",
+      "sources": [
+        {
+          "name": "Kubernetes v1.37.0-rc.0",
+          "url": "https://github.com/kubernetes/kubernetes/releases/tag/v1.37.0-rc.0"
+        }
+      ]
+    },
+    {
+      "title": "Go 与 Rust 没有新的稳定大版本",
+      "summary": "Go 1.27 官方页面仍标注草案；Rust 当日也没有新的稳定版需要追赶。",
+      "judgment": "不要为凑数制造语言升级焦虑，优先验证已进入 Serving 前端的 Rust 路径。",
+      "sources": [
+        {
+          "name": "Go 1.27",
+          "url": "https://go.dev/doc/go1.27"
+        },
+        {
+          "name": "Rust Releases",
+          "url": "https://blog.rust-lang.org/releases/"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "vLLM 0.27.0 的核心信号是 Kimi K3 同时进入 Python 与 Rust 前端，并串起 AttnRes、DeepGEMM、压缩权重和共享专家切分；0.27.1 很快补上量化 DSpark Markov heads。SGLang 0.5.17 则把 DCP、推测解码、KDA Prefix Cache、跨层级 KV 与 LoRA 合成一套 day-0 路径。",
+    "judgment": "竞争单位已不是单个 Kernel，而是模型适配—入口—调度—KV—故障恢复的整条链路；生产评估要把正确性、冷启动和尾延迟与吞吐并列。",
+    "sources": [
+      {
+        "name": "vLLM v0.27.0",
+        "url": "https://github.com/vllm-project/vllm/releases/tag/v0.27.0"
+      },
+      {
+        "name": "vLLM v0.27.1",
+        "url": "https://github.com/vllm-project/vllm/releases/tag/v0.27.1"
+      },
+      {
+        "name": "SGLang v0.5.17",
+        "url": "https://github.com/sgl-project/sglang/releases/tag/v0.5.17"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Kubernetes 1.37 rc0 只适合测试环境，GPU 推理集群应先验证 Device Plugin、Gateway、Kueue 与 RDMA/NCCL。Go 1.27 仍为草案，可预演泛型方法、encoding/json/v2、更快内存分配和 goroutine 泄漏画像，但应锁在非生产 CI。Rust 真正值得跟的是继续进入 vLLM/SGLang 请求前端与控制路径。",
+    "judgment": "Rust 前端应重点观测 CPU/请求、P99、取消传播和连接风暴；语言与集群版本都要用真实故障模型验收。",
+    "sources": [
+      {
+        "name": "Kubernetes v1.37.0-rc.0",
+        "url": "https://github.com/kubernetes/kubernetes/releases/tag/v1.37.0-rc.0"
+      },
+      {
+        "name": "Go 1.27",
+        "url": "https://go.dev/doc/go1.27"
+      },
+      {
+        "name": "Rust Releases",
+        "url": "https://blog.rust-lang.org/releases/"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "vLLM 0.27.0 Release Notes",
+      "summary": "集中呈现 Kimi K3 全栈模型落地、Rust 前端、KV 分层、P/D 和大规模容错路径。",
+      "judgment": "应先读 Breaking environment change、前端与 P/D 章节，再决定升级范围。",
+      "sources": [
+        {
+          "name": "vLLM v0.27.0",
+          "url": "https://github.com/vllm-project/vllm/releases/tag/v0.27.0"
+        }
+      ]
+    },
+    {
+      "title": "SGLang 0.5.17 Release Notes",
+      "summary": "覆盖 DCP、DSpark、KV 层级化、Rust Frontend、Session Radix Cache 和 Weight Cache Daemon。",
+      "judgment": "适合作为评估新模型 day-0 serving 完整度的对照清单。",
+      "sources": [
+        {
+          "name": "SGLang v0.5.17",
+          "url": "https://github.com/sgl-project/sglang/releases/tag/v0.5.17"
+        }
+      ]
+    },
+    {
+      "title": "Robust KV Cache Management",
+      "summary": "联合建模未知输出长度下的 KV 预留、异构路由、Prefix Cache 与 SLO，报告相对固定分位数策略最高降本 56%。",
+      "judgment": "适合作为容量规划基线，不宜未经在线实验直接照搬调度策略。",
+      "sources": [
+        {
+          "name": "论文原文",
+          "url": "https://arxiv.org/abs/2607.16892"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "最近 24–48 小时未核验到足以进入本报的重大融资或并购公告。更可靠的产业信号来自开源交付：vLLM 与 SGLang 都在同一周期为超大 MoE/混合注意力模型补齐 Rust 前端、推测解码、量化、P/D 和 KV 分层能力。",
+    "judgment": "价值正从拥有 GPU 转向把异构算力稳定转化为可计量 token、SLO 与恢复能力；能证明利用率、P99、恢复时间和单位 token 成本的平台更具商业溢价。",
+    "sources": [
+      {
+        "name": "vLLM Releases",
+        "url": "https://github.com/vllm-project/vllm/releases"
+      },
+      {
+        "name": "SGLang Releases",
+        "url": "https://github.com/sgl-project/sglang/releases"
+      }
+    ]
+  },
+  "actions": [
+    "为 vLLM 0.27.0→0.27.1 建立最小升级门禁：目标模型输出一致性、量化 DSpark、P/D Connector、取消请求和多节点 DP。",
+    "用同一真实 Trace 对比 vLLM/SGLang 的 TTFT、TPOT、P99、CPU 核时、KV 命中率与重算率。",
+    "为混合注意力/MoE 模型增加冷启动—CUDA Graph 捕获—崩溃—恢复—重新接流量基准。",
+    "在隔离集群运行 Kubernetes 1.37 rc0 兼容性测试，不升级生产。",
+    "Go 1.27 仅进入实验 CI，待正式发布后再确定迁移窗口。"
+  ]
+}

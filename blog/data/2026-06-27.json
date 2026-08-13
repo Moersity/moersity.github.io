@@ -1,0 +1,109 @@
+{
+  "date": "2026-06-27",
+  "title": "推理优化从单机 Kernel 转向集群调度",
+  "deck": "历史补档：保留 6 月 27 日晨报的核心判断，并用可直接访问的一手来源补齐原预览中缺失的章节与链接。",
+  "top_items": [
+    {
+      "title": "推理系统竞争扩展到集群级编排",
+      "summary": "llm-d 将模型服务器之上的智能路由、分布式编排、KV 分层和基准验证组合成 Kubernetes 原生推理栈。",
+      "judgment": "生产收益的主要增量正在从单 GPU Kernel 转向路由、调度、缓存与集群利用率。",
+      "sources": [
+        {
+          "name": "llm-d 项目",
+          "url": "https://github.com/llm-d/llm-d"
+        }
+      ]
+    },
+    {
+      "title": "InferencePool 与 EPP 走向标准化",
+      "summary": "Gateway API Inference Extension 用 InferencePool 和 Endpoint Picker 扩展 Kubernetes Gateway，使网关能够基于模型、负载和缓存信号选择后端。",
+      "judgment": "Router、Gateway 与 Scheduler 的通用能力将更多沉淀到开放接口，而不是由每家公司重复实现。",
+      "sources": [
+        {
+          "name": "Gateway API Inference Extension",
+          "url": "https://github.com/kubernetes-sigs/gateway-api-inference-extension"
+        }
+      ]
+    },
+    {
+      "title": "Go 控制面与 Rust 数据面分工继续清晰",
+      "summary": "云原生控制面仍由 Go 生态主导，而 Rust 更适合承接高性能入口、网络与系统组件。",
+      "judgment": "AI Infra 的常见形态会是 Go 编排资源与生命周期，Rust/C++ 承担低延迟数据路径。",
+      "sources": [
+        {
+          "name": "Kubernetes",
+          "url": "https://github.com/kubernetes/kubernetes"
+        },
+        {
+          "name": "Rust 发布记录",
+          "url": "https://blog.rust-lang.org/releases/"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "值得持续跟踪的方向已从 FlashAttention、量化和单算子优化，扩展到 Prefix-aware Scheduling、KV Cache Routing、P/D 分离、动态批处理、多节点 Serving 与队列调度。llm-d Router 通过 EPP 把 KV locality、负载、优先级和 P/D 生命周期纳入请求放置。",
+    "judgment": "未来一年的系统层优化收益很可能超过孤立 Kernel 优化；评估指标需要覆盖端到端吞吐、P99、缓存命中率和故障恢复。",
+    "sources": [
+      {
+        "name": "llm-d Router",
+        "url": "https://github.com/llm-d/llm-d-router"
+      },
+      {
+        "name": "Gateway API Inference Extension",
+        "url": "https://github.com/kubernetes-sigs/gateway-api-inference-extension"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Rust 侧重点仍是 async runtime、io_uring、eBPF 与 AI Runtime；Go 的优势集中在开发速度、Kubernetes 生态和 AI Infra 控制面。Kubernetes 推理集群应关注 Kueue、Gateway API、GPU 调度和推理 Operator，而不只是 Deployment。",
+    "judgment": "控制面与数据面应按变化频率、延迟和安全边界拆分，不必把整套系统统一到一种语言。",
+    "sources": [
+      {
+        "name": "Kueue",
+        "url": "https://github.com/kubernetes-sigs/kueue"
+      },
+      {
+        "name": "Go 发布历史",
+        "url": "https://go.dev/doc/devel/release"
+      },
+      {
+        "name": "Rust 发布记录",
+        "url": "https://blog.rust-lang.org/releases/"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "Kops：安全扩展 eBPF 编译流水线",
+      "summary": "Kops 允许用户态编译器和内核模块引入新操作，同时用 vanilla eBPF proof sequence 复用现有 verifier；论文报告部分生产应用最高 12% 加速。",
+      "judgment": "对网络加速、GPU Exporter 与可观测性组件有启发，但引入原生 emit 时仍需审视可信计算基和跨架构维护成本。",
+      "sources": [
+        {
+          "name": "Kops 论文",
+          "url": "https://arxiv.org/abs/2606.24213"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "推理平台的竞争边界正在从模型服务器扩展到 Kubernetes 网关、智能路由、队列、缓存分层和容量管理。llm-d 等开放项目把这些能力组织成可复用的生产栈。",
+    "judgment": "产业价值会更多落在能稳定提高集群利用率、SLO 达成率与单位 token 经济性的系统，而不只是峰值算力。",
+    "sources": [
+      {
+        "name": "llm-d",
+        "url": "https://github.com/llm-d/llm-d"
+      },
+      {
+        "name": "llm-d Releases",
+        "url": "https://github.com/llm-d/llm-d/releases"
+      }
+    ]
+  },
+  "actions": [
+    "为线上 Trace 建立 Prefix 命中率、排队时间、TTFT、TPOT 与 GPU 利用率的联合看板。",
+    "用小规模集群验证 InferencePool、EPP 与现有 vLLM/SGLang Router 的能力边界。",
+    "把 P/D 分离和 KV 路由测试从吞吐扩展到网络拥塞、实例故障与缓存失效。",
+    "调研 Kops 的 proof/native emit 设计，评估其对 eBPF 可观测与网络组件的适用性。"
+  ]
+}
