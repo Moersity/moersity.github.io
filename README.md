@@ -4,11 +4,12 @@
 
 ## 日报自动化
 
-- GitHub Actions 每天北京时间 08:30 启动，并在 0–15 分钟内按日期确定性等待后发布。
-- 工作流调用 OpenAI Responses API 的网页搜索，生成带一手来源的结构化日报。
+- 本机 Codex 自动任务每天在北京时间 08:30–08:45 的确定性随机分钟运行。
+- Codex 使用 ChatGPT Plus/Pro 订阅能力检索并撰写日报，不调用 OpenAI API。
+- 自动任务在本机生成页面，通过已登录的 Git/GitHub 凭据提交并推送至 GitHub Pages。
 - 生成物写入 `blog/posts/`，归档数据位于 `blog/data/`，同时更新博客首页与 RSS。
 
-仓库需要配置 Actions secret `OPENAI_API_KEY`。可选的 Actions variable `OPENAI_MODEL` 默认是 `gpt-5.6-luna`。
+运行时 Mac 必须保持唤醒、联网，并确保 Codex 与 GitHub CLI 登录有效。仓库不需要 `OPENAI_API_KEY`。
 
 本地用已有 JSON 重建页面：
 

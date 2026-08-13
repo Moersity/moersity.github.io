@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate a sourced Chinese inference-systems report and static blog pages."""
+"""Render a sourced Chinese inference-systems report as static blog pages."""
 
 from __future__ import annotations
 
@@ -7,12 +7,8 @@ import argparse
 import datetime as dt
 import html
 import json
-import os
 import pathlib
 import re
-import sys
-import urllib.error
-import urllib.request
 from zoneinfo import ZoneInfo
 
 
@@ -66,44 +62,6 @@ SCHEMA = {
         },
     },
 }
-
-
-def api_report(day: str) -> dict:
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise SystemExit("OPENAI_API_KEY is required")
-    model = os.environ.get("OPENAI_MODEL", "gpt-5.6-luna")
-    prompt = f"""生成 {day} 的中文《推理系统技术日报》。
-聚焦 AI/大模型/推理系统，以及后端、Golang、Rust、Kubernetes。只筛选最近24–48小时真正重要的变化；没有重要变化时明确写出，不得凑数。优先官方公告、项目仓库、论文原文和公司公告。每个事实必须附可直接打开的一手来源 URL。内容要有技术深度、工程判断、可落地工具/项目/论文、产业与投资信号。不要重复前一天已报道的旧闻，除非出现实质进展。输出严格符合给定 JSON schema。"""
-    payload = {
-        "model": model,
-        "instructions": "你是严谨的推理系统技术编辑。使用网页搜索核验所有时效性事实；不要编造版本、日期、性能数字或链接。用简洁中文写作。",
-        "input": prompt,
-        "tools": [{"type": "web_search"}],
-        "reasoning": {"effort": "low"},
-        "text": {"verbosity": "medium", "format": {"type": "json_schema", "name": "daily_report", "strict": True, "schema": SCHEMA}},
-        "store": False,
-    }
-    request = urllib.request.Request(
-        "https://api.openai.com/v1/responses",
-        data=json.dumps(payload).encode(),
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=300) as response:
-            raw = json.load(response)
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode(errors="replace")
-        raise SystemExit(f"OpenAI API failed: HTTP {exc.code}: {detail}") from exc
-    chunks = []
-    for output in raw.get("output", []):
-        for content in output.get("content", []):
-            if content.get("type") == "output_text":
-                chunks.append(content.get("text", ""))
-    if not chunks:
-        raise SystemExit("OpenAI API returned no output_text")
-    return json.loads("".join(chunks))
 
 
 def safe_url(value: str) -> str:
@@ -186,9 +144,9 @@ def validate(report: dict, day: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--date", default=dt.datetime.now(TZ).date().isoformat())
-    parser.add_argument("--input", type=pathlib.Path, help="Use an existing report JSON instead of the API")
+    parser.add_argument("--input", type=pathlib.Path, required=True, help="Structured report JSON produced by the local Codex automation")
     args = parser.parse_args()
-    report = json.loads(args.input.read_text()) if args.input else api_report(args.date)
+    report = json.loads(args.input.read_text())
     validate(report, args.date)
     POSTS.mkdir(parents=True, exist_ok=True)
     DATA.mkdir(parents=True, exist_ok=True)
