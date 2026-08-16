@@ -1,0 +1,159 @@
+{
+  "date": "2026-08-16",
+  "title": "低变化窗口，更该补齐配额与回归门禁",
+  "deck": "最近 24–48 小时主流推理与语言项目没有新的正式大版本；今天把注意力放到 Kueue 的配额正确性、真实工作负载评测和生产升级纪律。",
+  "top_items": [
+    {
+      "title": "主流推理项目近 48 小时无新正式版本",
+      "summary": "vLLM 最新正式版仍为 v0.27.1，SGLang 最新正式版仍为 v0.5.17；本日没有新的稳定版本值得重复报道。",
+      "judgment": "低变化日不应制造升级焦虑，应把窗口用于目标模型、量化路径、P/D 与故障恢复回归。",
+      "sources": [
+        {
+          "name": "vLLM Releases",
+          "url": "https://github.com/vllm-project/vllm/releases"
+        },
+        {
+          "name": "SGLang Releases",
+          "url": "https://github.com/sgl-project/sglang/releases"
+        }
+      ]
+    },
+    {
+      "title": "Kueue v0.19.1 强化配额正确性",
+      "summary": "该补丁修复 LeaderWorkerSet 扩容绕过已预留配额、GPU 等扩展资源在极小用量下被截断为零，以及负资源请求形成虚假配额信用等问题。",
+      "judgment": "AI 集群的调度正确性就是成本与隔离边界；升级前必须阅读跨越的 .0 版本说明，并用真实队列重放验证。",
+      "sources": [
+        {
+          "name": "Kueue v0.19.1",
+          "url": "https://github.com/kubernetes-sigs/kueue/releases/tag/v0.19.1"
+        }
+      ]
+    },
+    {
+      "title": "生产评测应从峰值吞吐转向真实采用与组合路径",
+      "summary": "近期实证研究梳理真实 LLM Serving 项目对框架、优化方法和系统设计的采用情况，强调研究方案与生产落地之间仍存在明显距离。",
+      "judgment": "选型应优先验证团队实际需要的模型、硬件、流量分布和运维路径，而不是汇总不同论文中的最好数字。",
+      "sources": [
+        {
+          "name": "LLM Serving in the Wild",
+          "url": "https://arxiv.org/abs/2608.03036"
+        }
+      ]
+    },
+    {
+      "title": "Kubernetes 与 Go、Rust 暂无新的稳定大版本",
+      "summary": "Kubernetes 最新 1.37 仍是 rc.0；Go 与 Rust 的稳定发布页近 48 小时也没有新的正式大版本。",
+      "judgment": "生产环境继续留在已验证版本，候选版只用于 Device Plugin、Kueue、Gateway 与网络栈兼容测试。",
+      "sources": [
+        {
+          "name": "Kubernetes Releases",
+          "url": "https://github.com/kubernetes/kubernetes/releases"
+        },
+        {
+          "name": "Go Release History",
+          "url": "https://go.dev/doc/devel/release"
+        },
+        {
+          "name": "Rust Releases",
+          "url": "https://blog.rust-lang.org/releases/"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "本日没有新的 vLLM 或 SGLang 稳定版本。结合近期项目发布可以看出，推理栈的风险已从单个 Kernel 扩展到 Rust/Python 前端、量化、推测解码、P/D、KV 分层、跨节点通信与恢复路径的组合交互。vLLM 对生产质量的说明也把分支冻结、发布候选与回归验证放在固定发布节奏之前。",
+    "judgment": "低变化窗口最适合补齐组合测试矩阵：同一模型要覆盖长短输入、取消请求、KV 命中/失效、节点重启与流量恢复，而不是只保存一次峰值 tokens/s。",
+    "sources": [
+      {
+        "name": "vLLM Production Quality",
+        "url": "https://github.com/vllm-project/vllm-project.github.io/blob/main/_posts/2026-07-16-keeping-vllm-production-quality.md"
+      },
+      {
+        "name": "vLLM Releases",
+        "url": "https://github.com/vllm-project/vllm/releases"
+      },
+      {
+        "name": "SGLang Releases",
+        "url": "https://github.com/sgl-project/sglang/releases"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Kueue v0.19.1 的多项修复直接涉及 AI 集群：LeaderWorkerSet 组大小在受管期间默认不可变，避免扩容绕过配额；AdmissionFairSharing 修正 GPU 等扩展资源的小额用量累计；TAS、弹性作业、MultiKueue 与 Ray 工作负载也有一致性修复。Kubernetes 1.37 仍处于候选阶段，Go 与 Rust 今日没有新的稳定大版本。",
+    "judgment": "对 GPU 平台而言，控制面的首要指标不是功能数量，而是任何扩缩容、抢占、故障替换和跨集群传播都不能导致多跑 Pod、少计 GPU 或永久占用配额。",
+    "sources": [
+      {
+        "name": "Kueue v0.19.1",
+        "url": "https://github.com/kubernetes-sigs/kueue/releases/tag/v0.19.1"
+      },
+      {
+        "name": "Kubernetes Releases",
+        "url": "https://github.com/kubernetes/kubernetes/releases"
+      },
+      {
+        "name": "Go Release History",
+        "url": "https://go.dev/doc/devel/release"
+      },
+      {
+        "name": "Rust Releases",
+        "url": "https://blog.rust-lang.org/releases/"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "Kueue v0.19.1 Release Notes",
+      "summary": "集中列出升级前必读事项以及配额、公平共享、TAS、弹性作业、MultiKueue 和可观测性修复。",
+      "judgment": "如果生产使用 Kueue，这是今天最值得逐条映射到自身配置的材料。",
+      "sources": [
+        {
+          "name": "GitHub Release",
+          "url": "https://github.com/kubernetes-sigs/kueue/releases/tag/v0.19.1"
+        }
+      ]
+    },
+    {
+      "title": "LLM Serving in the Wild",
+      "summary": "从真实项目采用角度审视推理框架、优化方法与系统设计，而不是再给出一组孤立的实验室峰值。",
+      "judgment": "适合用来审查内部路线图：哪些优化已有生态验证，哪些仍需要承担集成与维护成本。",
+      "sources": [
+        {
+          "name": "arXiv",
+          "url": "https://arxiv.org/abs/2608.03036"
+        }
+      ]
+    },
+    {
+      "title": "Keeping vLLM Production Quality",
+      "summary": "说明 vLLM 如何处理双周节奏、分支冻结、候选构建、回归和延迟发布。",
+      "judgment": "可借鉴为内部推理镜像的发布治理模板，尤其适合避免追 main 带来的不可控回归。",
+      "sources": [
+        {
+          "name": "vLLM 官方博客源码",
+          "url": "https://github.com/vllm-project/vllm-project.github.io/blob/main/_posts/2026-07-16-keeping-vllm-production-quality.md"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "最近 24–48 小时未核验到足够重大且有一手公告支持的推理基础设施融资或并购，因此不收录传闻。更可靠的信号来自开源维护：调度项目持续修复配额绕过、公平共享和故障恢复，说明企业采购的价值正在从单机 benchmark 转向可审计的资源隔离、SLO 和升级稳定性。",
+    "judgment": "能把 GPU 配额账、性能回归和故障恢复做成持续证据的平台，比只展示峰值吞吐更容易形成长期商业壁垒。",
+    "sources": [
+      {
+        "name": "Kueue v0.19.1",
+        "url": "https://github.com/kubernetes-sigs/kueue/releases/tag/v0.19.1"
+      },
+      {
+        "name": "LLM Serving in the Wild",
+        "url": "https://arxiv.org/abs/2608.03036"
+      }
+    ]
+  },
+  "actions": [
+    "若使用 Kueue LeaderWorkerSet，盘点是否会原地修改 leaderWorkerTemplate.size；升级后应改为按新组大小重建。",
+    "为 GPU 等扩展资源增加配额守恒测试：提交、扩容、抢占、失败替换和删除后，已预留、运行中与可用配额总量必须闭合。",
+    "用真实 Trace 建立 vLLM/SGLang 组合回归矩阵，至少覆盖 P50/P99 TTFT、TPOT、CPU 核时、KV 命中率、取消传播与崩溃恢复。",
+    "将推理镜像发布拆成冻结、候选、目标模型回归和小流量验证四步，不直接追随主分支。",
+    "Kubernetes 1.37 rc.0 继续仅用于隔离兼容测试；Go 与 Rust 暂无需要紧急推进的新稳定大版本。"
+  ]
+}
