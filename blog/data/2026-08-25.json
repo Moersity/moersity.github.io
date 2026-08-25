@@ -1,0 +1,178 @@
+{
+  "date": "2026-08-25",
+  "title": "主干无新版本，但三处生产边界值得立即补测",
+  "deck": "vLLM 补齐音频输入限额并修复 TP 推测解码初始化，SGLang 修复回退后的循环状态串扰；这些都已合入主干，但尚不是新的稳定版。",
+  "top_items": [
+    {
+      "title": "vLLM 补齐所有音频入口的文件大小限制",
+      "summary": "8 月 24 日合入的安全修复把 VLLM_MAX_AUDIO_CLIP_FILESIZE_MB 校验下沉到 AudioMediaIO.load_file，覆盖文件、字节、Base64 与 HTTP 下载路径；此前本地文件路径可绕过限制。",
+      "judgment": "多模态网关不能只在上传接口限流；URL、Base64、本地挂载和重定向后的真实读取都应共享同一资源预算。该修复目前位于主干，生产环境应先在现有版本外围增加尺寸与解码后资源限制。",
+      "sources": [
+        {
+          "name": "vLLM PR #53561",
+          "url": "https://github.com/vllm-project/vllm/pull/53561"
+        }
+      ]
+    },
+    {
+      "title": "SGLang 修复 Decode Retraction 后循环状态串扰",
+      "summary": "滑动窗口注意力与循环状态并存的模型在请求回退时，旧路径只搬运 KV 而遗漏 Mamba/SSM 状态，恢复后可能读取被其他请求复用的槽位；修复增加循环状态备份并统一后端选择条件。",
+      "judgment": "这是典型的静默正确性故障，比显式崩溃更危险。任何启用回退、PD 分离或混合注意力状态的服务，都应把强制回退后的答案质量与状态校验加入发布门禁。",
+      "sources": [
+        {
+          "name": "SGLang PR #35957",
+          "url": "https://github.com/sgl-project/sglang/pull/35957"
+        }
+      ]
+    },
+    {
+      "title": "vLLM 修复 TP>1 下宽 Draft Model 的推测解码启动崩溃",
+      "summary": "TRT-LLM 融合 AllReduce 与 RMSNorm 的工作区原先只按 Target Model 隐藏维度分配；当 Draft Model 更宽且 TP>1 时会在初始化阶段失败。修复改为取两者最大隐藏维度，并在两张 H100 上完成三组回归验证。",
+      "judgment": "推测解码验收不能只比较接受率和吞吐；Target/Draft 的维度组合、TP 拓扑与共享工作区也必须进入配置矩阵。",
+      "sources": [
+        {
+          "name": "vLLM PR #52193",
+          "url": "https://github.com/vllm-project/vllm/pull/52193"
+        }
+      ]
+    },
+    {
+      "title": "vLLM 为批次不变 Matmul 增加 Hopper 与 Ada 分架构配置",
+      "summary": "新合入的配置表针对 Qwen3-1.7B BF16 的五组权重形状和不同 M 桶选择固定归约顺序的 Kernel 参数；作者在 RTX 4090 D 与 H20 上报告 Decode Kernel 几何平均分别提升约 3.02 倍和 2.79 倍，但初始化专用 Kernel 增多。",
+      "judgment": "确定性不必永久接受高额性能税，但离线调参结果高度绑定模型形状、数据类型和 GPU 架构；只应把该数字视为复现实验起点。",
+      "sources": [
+        {
+          "name": "vLLM PR #53247",
+          "url": "https://github.com/vllm-project/vllm/pull/53247"
+        }
+      ]
+    },
+    {
+      "title": "KServe 修补模型下载链路的依赖风险",
+      "summary": "KServe 主干将 urllib3 约束到至少 2.6.3，以修复流式请求跟随重定向时可能提前完整解压响应体的问题；项目判断其模型仓库下载路径可触达相关 streaming 行为。",
+      "judgment": "模型拉取器是控制面到外部仓库的高权限数据入口，必须同时限制重定向、压缩比、落盘空间、总字节数与超时，不能只依赖 HTTP 流式读取。",
+      "sources": [
+        {
+          "name": "KServe PR #6023",
+          "url": "https://github.com/kserve/kserve/pull/6023"
+        },
+        {
+          "name": "urllib3 安全公告",
+          "url": "https://github.com/urllib3/urllib3/security/advisories/GHSA-38jv-5279-wg99"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "最近 24 小时没有新的 vLLM 或 SGLang 稳定版本，变化集中在主干正确性与安全修复。vLLM 一边补齐所有音频入口的限额，一边修复 TP 推测解码工作区和确定性 Matmul 性能；SGLang 则暴露出请求回退时循环状态未随 KV 一同迁移的静默错误。三者共同说明：现代推理服务的状态已不只是标准 KV，还包含 Draft/Target 共享工作区、SSM 循环状态、多模态媒体和可复现 Kernel 配置。",
+    "judgment": "把“请求状态清单”做成测试资产：逐项记录所有需迁移、回收、限额和复现的内存对象，并对取消、回退、抢占、重试和模型切换执行故障注入。主干修复只用于评估与回补，不应直接替换稳定版本。",
+    "sources": [
+      {
+        "name": "vLLM 音频限额修复",
+        "url": "https://github.com/vllm-project/vllm/pull/53561"
+      },
+      {
+        "name": "vLLM TP 推测解码修复",
+        "url": "https://github.com/vllm-project/vllm/pull/52193"
+      },
+      {
+        "name": "SGLang 回退状态修复",
+        "url": "https://github.com/sgl-project/sglang/pull/35957"
+      },
+      {
+        "name": "vLLM 确定性 Matmul 调优",
+        "url": "https://github.com/vllm-project/vllm/pull/53247"
+      }
+    ]
+  },
+  "backend": {
+    "content": "云原生侧没有新的 Kubernetes 稳定补丁，KServe 主干的两项依赖修复更值得运维关注：模型存储组件升级 urllib3，量化参数扩展组件升级 OpenTelemetry Go SDK。后者的 PATH 劫持路径仅在 BSD/Solaris 构建标签下存在，KServe 的 Linux 部署不可达；前者则与面向用户配置模型仓库的流式下载路径相关。补课项是 Go 1.27：generic methods、正式可用的 goroutineleak profile、encoding/json/v2 与小对象分配优化，都适合推理控制面评估，但 JSON v2 的严格默认与错误文本变化需要兼容性测试。",
+    "judgment": "安全升级要区分“扫描器命中”和“生产可触达”，并为每个告警保留路径证据。Go 1.27 建议先跑控制面协议兼容、JSON Golden Test、pprof 暴露面与基准测试，再逐服务升级。",
+    "sources": [
+      {
+        "name": "KServe urllib3 修复",
+        "url": "https://github.com/kserve/kserve/pull/6023"
+      },
+      {
+        "name": "KServe OpenTelemetry Go 修复",
+        "url": "https://github.com/kserve/kserve/pull/6019"
+      },
+      {
+        "name": "Go 1.27 Release Notes",
+        "url": "https://go.dev/doc/go1.27"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "SGLang Decode Retraction 状态修复",
+      "summary": "PR 给出状态遗漏的调用链、受影响模型形态、物理槽复用原因，以及强制回退前后的 GSM8K 结果。",
+      "judgment": "最值得精读；它提供了从接口签名一致、状态所有权到端到端质量回归的完整故障分析模板。",
+      "sources": [
+        {
+          "name": "SGLang PR #35957",
+          "url": "https://github.com/sgl-project/sglang/pull/35957"
+        }
+      ]
+    },
+    {
+      "title": "vLLM 多模态音频资源限制",
+      "summary": "修复覆盖 load_bytes、load_base64、load_file 与 HTTP 下载，并补测 Content-Length 预拒绝路径。",
+      "judgment": "可直接转化为内部媒体入口审计清单，尤其适合检查 Base64 放大、文件挂载和远程 URL。",
+      "sources": [
+        {
+          "name": "vLLM PR #53561",
+          "url": "https://github.com/vllm-project/vllm/pull/53561"
+        }
+      ]
+    },
+    {
+      "title": "vLLM 批次不变 Matmul 调优记录",
+      "summary": "PR 同时给出 Kernel、端到端吞吐、延迟税、初始化开销与位级一致性门槛。",
+      "judgment": "比单个加速比更有价值的是其验证方法：性能、确定性、预热成本和未知架构回退需要一起报告。",
+      "sources": [
+        {
+          "name": "vLLM PR #53247",
+          "url": "https://github.com/vllm-project/vllm/pull/53247"
+        }
+      ]
+    },
+    {
+      "title": "Go 1.27 Release Notes",
+      "summary": "包含 generic methods、goroutineleak、encoding/json/v2、HTTP 行为变化、小对象分配优化与实验 SIMD。",
+      "judgment": "控制面优先关注 JSON 兼容、HTTP 连接复用和泄漏剖析；实验 SIMD 暂不应成为生产依赖。",
+      "sources": [
+        {
+          "name": "Go 官方发布说明",
+          "url": "https://go.dev/doc/go1.27"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "最近 24–48 小时未核验到足够重大且有公司公告支持的推理基础设施融资或并购。工程侧更明确的信号是：vLLM 与 SGLang 的新增价值正在从“支持新模型”扩展到资源边界、状态迁移、确定性和故障恢复；KServe 则继续承担模型供应链与依赖治理。",
+    "judgment": "企业采购会越来越要求可证明的安全边界和正确性证据，而不只是 Tokens/s。能公开复现故障矩阵、升级影响与回滚条件的项目，更容易进入生产标准栈。",
+    "sources": [
+      {
+        "name": "vLLM 音频限额修复",
+        "url": "https://github.com/vllm-project/vllm/pull/53561"
+      },
+      {
+        "name": "SGLang 回退状态修复",
+        "url": "https://github.com/sgl-project/sglang/pull/35957"
+      },
+      {
+        "name": "KServe 模型下载依赖修复",
+        "url": "https://github.com/kserve/kserve/pull/6023"
+      }
+    ]
+  },
+  "actions": [
+    "盘点多模态服务的文件、URL、Base64 与本地挂载入口，统一设置原始字节、解码后大小、时长、压缩比和超时限制。",
+    "为 SGLang 混合注意力或 SSM 模型增加强制 Decode Retraction 测试，校验 KV、滑动窗口与循环状态在回退前后逐项一致。",
+    "扩充推测解码配置矩阵，覆盖 Draft Hidden Size 大于 Target、TP=1/2、多种 Draft 宽度与无推测解码回归。",
+    "复现 vLLM 确定性 Matmul 调优时同时记录 Kernel 性能、端到端吞吐、首启预热时间和位级一致性，不外推跨架构结果。",
+    "审计模型仓库下载器的重定向与压缩响应处理，并核对 urllib3、OpenTelemetry Go 的实际可触达路径。",
+    "为 Go 1.27 建立控制面候选镜像，运行 JSON Golden Test、HTTP 连接复用基准、goroutineleak 与回滚验证。"
+  ]
+}
