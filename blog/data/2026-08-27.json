@@ -1,0 +1,182 @@
+{
+  "date": "2026-08-27",
+  "title": "vLLM 0.28 与 Kubernetes 1.37 同日到位，默认值和调度边界一起变化",
+  "deck": "vLLM 把分层 KV、E/P/D 与新模型运行器推向可用，同时修改批处理和依赖默认；Kubernetes 1.37 则让 Scale-to-Zero、Gang Scheduling 与 DRA 更贴近 AI 集群。",
+  "top_items": [
+    {
+      "title": "vLLM v0.28.0 发布，升级首先要审默认值与 Breaking Changes",
+      "summary": "该版本包含 584 个提交、270 位贡献者；max_num_batched_tokens 从 8192 提高到 16384，Mamba 默认启用 Prefix Cache，Blackwell CUDA Graph 捕获上限提高到 1024，同时 Transformers 升至 5.15.0、bitsandbytes 移至外部插件，并移除两个旧参数。",
+      "judgment": "这不是只换镜像标签的升级。批处理上限会改变显存与排队曲线，依赖和已删除参数会直接影响启动；必须先固定旧版基线，再逐项启用新默认。",
+      "sources": [
+        {
+          "name": "vLLM v0.28.0 Release Notes",
+          "url": "https://github.com/vllm-project/vllm/releases/tag/v0.28.0"
+        }
+      ]
+    },
+    {
+      "title": "vLLM 把分层 KV Offload 与 E/P/D 推进到 Model Runner V2",
+      "summary": "v0.28.0 增加磁盘二级 KV Offload、可插拔 Secondary Tier Manager、部分命中结果、分层指标和与并行方式解耦的 CPU Layout；Model Runner V2 同时加入 E/P/D 分离、权重 Offload 与多层 MTP KV Cache。",
+      "judgment": "推理集群正从“GPU 内缓存”转向显存、主存、磁盘与远端连接器组成的存储层次；收益取决于工作集、链路带宽和尾延迟，不能只看命中率。",
+      "sources": [
+        {
+          "name": "vLLM v0.28.0 KV Offloading",
+          "url": "https://github.com/vllm-project/vllm/releases/tag/v0.28.0"
+        }
+      ]
+    },
+    {
+      "title": "Kubernetes v1.37.0 发布，包含 67 项增强",
+      "summary": "官方统计 16 项进入 Stable、23 项进入 Beta、27 项进入 Alpha，另有 1 项弃用或移除。与推理平台直接相关的变化包括 HPA Scale-to-Zero 进入 Beta 并默认启用、metrics.k8s.io v1 Stable，以及多项 DRA 状态与设备能力增强。",
+      "judgment": "1.37 为 GPU 控制面提供了更完整的原生积木，但新主版本不应直接进生产；先验证 metrics API、扩缩容控制器、Device Plugin/DRA 驱动与版本偏差。",
+      "sources": [
+        {
+          "name": "Kubernetes v1.37 发布公告",
+          "url": "https://kubernetes.io/blog/2026/08/26/kubernetes-v1-37-release/"
+        },
+        {
+          "name": "Kubernetes v1.37.0 Release",
+          "url": "https://github.com/kubernetes/kubernetes/releases/tag/v1.37.0"
+        }
+      ]
+    },
+    {
+      "title": "Gang Scheduling 与 Workload-aware Preemption 进入 Beta",
+      "summary": "Kubernetes 1.37 通过 Workload API 与 PodGroup 提供成组调度、队列和面向 Workload 的抢占；DRA ResourceClaim 也可与 Workload/PodGroup 关联，从而为一组 Pod 共享和生成设备申请。",
+      "judgment": "这对多副本推理、Prefill/Decode 组和训练任务很关键，但相关构建块仍需显式 Feature Gate；落地前要验证与 Kueue、现有调度器插件及队列策略的所有权边界。",
+      "sources": [
+        {
+          "name": "Kubernetes v1.37 调度更新",
+          "url": "https://kubernetes.io/blog/2026/08/26/kubernetes-v1-37-release/"
+        },
+        {
+          "name": "Workload Builder 文档",
+          "url": "https://kubernetes.io/docs/concepts/workloads/workload-api/workloadbuilder/"
+        },
+        {
+          "name": "DRA Workload ResourceClaims",
+          "url": "https://kubernetes.io/docs/concepts/resource-management/dynamic-resource-allocation/dra-api/"
+        }
+      ]
+    },
+    {
+      "title": "Kubernetes 1.37 的升级风险不只在 API",
+      "summary": "SELinuxMount 与 SELinuxChangePolicy 进入 Stable 并默认启用，启用对应 CSI 能力后，共享卷上使用不同 SELinux Label 的 Pod 可能无法启动；仍依赖 cgroup v1 的节点默认会让 kubelet 初始化失败，临时覆盖并非长期方案。",
+      "judgment": "GPU 节点升级要同时检查 CSI、SELinux、cgroup v2、驱动 DaemonSet 与健康探针；API Server 升级成功不代表模型 Pod 能正常恢复。",
+      "sources": [
+        {
+          "name": "Kubernetes v1.37 升级注意事项",
+          "url": "https://kubernetes.io/blog/2026/08/26/kubernetes-v1-37-release/"
+        },
+        {
+          "name": "Kubernetes 1.37 Release Series",
+          "url": "https://kubernetes.io/releases/1.37/"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "vLLM 0.28.0 的主线是把状态、并行与前端继续拆层：Model Runner V2 支持 E/P/D、权重 Offload 和多层 MTP KV，KV Offload 扩展到磁盘与外部二级层管理器，Rust 前端增加独立 Renderer、gRPC 多模态和显式 DP Rank 路由。Kimi-K3、DeepSeek V4 与推测解码覆盖继续扩张，但默认批处理上限、Prefix Cache 和 CUDA Graph 捕获范围也同步改变。",
+    "judgment": "升级验收应拆成五条曲线：空载显存、首启与 Graph Capture、TTFT、ITL、P99；并分别测试无 Offload、CPU、Disk 与远端 Tier。版本收益只有在同一 Trace、同一模型工件和同一 SLO 下才可比较。",
+    "sources": [
+      {
+        "name": "vLLM v0.28.0",
+        "url": "https://github.com/vllm-project/vllm/releases/tag/v0.28.0"
+      },
+      {
+        "name": "vLLM v0.27.1…v0.28.0 Diff",
+        "url": "https://github.com/vllm-project/vllm/compare/v0.27.1...v0.28.0"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Kubernetes 1.37 的 67 项增强覆盖 HPA Scale-to-Zero、metrics.k8s.io v1、Gang Scheduling、Workload-aware Preemption、Workload ResourceClaims 与 DRA 设备状态；这些能力与 AI 控制面的排队、成组放置、弹性和设备可观测性直接相关。最近 24–48 小时没有新的 Go 或 Rust 稳定版本，今天的后端重点应放在 Kubernetes API、Feature Gate 与节点行为的兼容验证。",
+    "judgment": "不要一次性把 1.37 的 Beta 能力全开。建议按“指标 API→Scale-to-Zero→Workload/PodGroup→DRA”分阶段启用，每阶段保留回滚开关并监控 Pending、抢占、设备分配和冷启动时间。",
+    "sources": [
+      {
+        "name": "Kubernetes v1.37 发布公告",
+        "url": "https://kubernetes.io/blog/2026/08/26/kubernetes-v1-37-release/"
+      },
+      {
+        "name": "Kubernetes v1.37 Changelog",
+        "url": "https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.37.md"
+      },
+      {
+        "name": "Workload Builder",
+        "url": "https://kubernetes.io/docs/concepts/workloads/workload-api/workloadbuilder/"
+      },
+      {
+        "name": "DRA API",
+        "url": "https://kubernetes.io/docs/concepts/resource-management/dynamic-resource-allocation/dra-api/"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "vLLM v0.28.0 Release Notes",
+      "summary": "完整覆盖新默认、Breaking Changes、Model Runner V2、分层 KV、推测解码、硬件后端、安全修复和发布工件。",
+      "judgment": "先读 New Defaults、Breaking Changes、Dependencies 与 Security，再看模型性能亮点；这些部分最直接决定升级风险。",
+      "sources": [
+        {
+          "name": "GitHub Release",
+          "url": "https://github.com/vllm-project/vllm/releases/tag/v0.28.0"
+        }
+      ]
+    },
+    {
+      "title": "Kubernetes v1.37 官方发布公告",
+      "summary": "用稳定性等级组织 67 项增强，并单列 Scale-to-Zero、Gang Scheduling、DRA、SELinux 和 cgroup v1 迁移风险。",
+      "judgment": "适合用作升级评审目录；每项能力都应追到 Feature Gate、API Version 和驱动依赖，而不是只读亮点。",
+      "sources": [
+        {
+          "name": "Kubernetes Blog",
+          "url": "https://kubernetes.io/blog/2026/08/26/kubernetes-v1-37-release/"
+        }
+      ]
+    },
+    {
+      "title": "Scheduling Building Blocks 与 workloadbuilder",
+      "summary": "文档解释控制器如何把 Gang、拓扑和中断意图编译成 Workload、PodGroup 与 CompositePodGroup 对象，并明确 1.37 Beta 默认关闭。",
+      "judgment": "做自研推理 Operator 时优先复用标准构建块，避免再创造一套与调度器和 Kueue 难以对接的 PodGroup 语义。",
+      "sources": [
+        {
+          "name": "Kubernetes 文档",
+          "url": "https://kubernetes.io/docs/concepts/workloads/workload-api/workloadbuilder/"
+        }
+      ]
+    },
+    {
+      "title": "DRA Workload ResourceClaims",
+      "summary": "1.37 Beta 允许 Workload 与 PodGroup 共享或基于模板生成 ResourceClaim，突破单纯逐 Pod 设备申请的管理边界。",
+      "judgment": "对共享加速器、成组实例和多角色推理有潜力，但必须先核验 DRA Driver、资源回收与队列抢占的联合行为。",
+      "sources": [
+        {
+          "name": "DRA API 文档",
+          "url": "https://kubernetes.io/docs/concepts/resource-management/dynamic-resource-allocation/dra-api/"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "最近 24–48 小时未核验到足够重大且有公司公告支持的推理基础设施融资或并购。产业信号更多来自开源栈的同时成熟：vLLM 正把分层 KV、E/P/D、Rust Frontend 和多硬件后端收拢进单一版本；Kubernetes 则把成组调度、Workload-aware Preemption、DRA 与 Scale-to-Zero 推向更高稳定性。",
+    "judgment": "推理基础设施的价值正在从单引擎吞吐扩展到“引擎状态层 + Kubernetes 调度层”的协同。能控制缓存层次、队列、设备申请和故障恢复的团队，会比只调 Kernel 的团队更接近平台预算。",
+    "sources": [
+      {
+        "name": "vLLM v0.28.0",
+        "url": "https://github.com/vllm-project/vllm/releases/tag/v0.28.0"
+      },
+      {
+        "name": "Kubernetes v1.37",
+        "url": "https://kubernetes.io/blog/2026/08/26/kubernetes-v1-37-release/"
+      }
+    ]
+  },
+  "actions": [
+    "建立 vLLM 0.27.1 与 0.28.0 双镜像基线，先固定 max_num_batched_tokens、Prefix Cache 和 CUDA Graph 参数，再比较新默认。",
+    "扫描启动参数与依赖：移除 calculate_kv_scales、override_attention_dtype，确认 bitsandbytes 外部插件和 Transformers 5.15 兼容性。",
+    "用同一生产 Trace 分别测试无 Offload、CPU Tier、Disk Tier，记录命中率之外的 TTFT、P99、磁盘队列和恢复时间。",
+    "在隔离集群升级 Kubernetes 1.37，验证 metrics.k8s.io、HPA Scale-to-Zero、GPU Driver、CSI/SELinux 与 cgroup v2。",
+    "为 Gang Scheduling、Workload-aware Preemption 和 DRA Workload Claims 建立 Feature Gate 清单，并与 Kueue/自研调度器做冲突测试。",
+    "执行节点故障与回滚演练，确认模型 Pod 在控制面升级成功后仍能重新分配设备、挂载卷并恢复流量。"
+  ]
+}
