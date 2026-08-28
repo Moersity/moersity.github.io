@@ -1,0 +1,186 @@
+{
+  "date": "2026-08-28",
+  "title": "版本发布后，真正的生产风险藏在默认切换与状态所有权里",
+  "deck": "vLLM 主干默认转向 Model Runner V2，却同时回退一次会触发 Fork 死锁的预热优化；SGLang、KServe 和 Kueue 的新改动则共同指向负载、缓存、适配器与配额的真实所有权。",
+  "top_items": [
+    {
+      "title": "vLLM 主干开始默认使用 Model Runner V2",
+      "summary": "8 月 27 日合入的变更将所有模型默认切到 MRV2；部分 ROCm 模型因性能问题仍保留例外，MRV2 尚未支持的特性也继续回退到 MRV1。该变化晚于 v0.28.0 发布，尚未进入新的稳定版本。",
+      "judgment": "默认切换比新增功能影响更大。平台需要显式记录每个模型最终落到 MRV1 还是 MRV2，并把性能、显存、睡眠唤醒、LoRA 与并行特性纳入双路径回归。",
+      "sources": [
+        {
+          "name": "vLLM PR #53183",
+          "url": "https://github.com/vllm-project/vllm/pull/53183"
+        },
+        {
+          "name": "vLLM v0.28.0",
+          "url": "https://github.com/vllm-project/vllm/releases/tag/v0.28.0"
+        }
+      ]
+    },
+    {
+      "title": "vLLM 回退 Renderer 并行预热，避免 Fork 死锁",
+      "summary": "主干撤销了多模态 Renderer 预热与 Engine Core 初始化重叠的优化：H200 与 MI300 CI 均复现后台线程执行 Whisper 预处理时，主线程 Fork Engine Core 进程后长时间挂起。",
+      "judgment": "Python 多线程状态下 Fork 是启动路径的高风险组合。任何并行预热优化都必须覆盖不同加速器、处理器与启动方式，并把“无日志卡死”作为独立故障类型监控。",
+      "sources": [
+        {
+          "name": "vLLM PR #54023",
+          "url": "https://github.com/vllm-project/vllm/pull/54023"
+        }
+      ]
+    },
+    {
+      "title": "LoRA 路径安全从协议入口延伸到挂载目录",
+      "summary": "vLLM Rust Frontend 将本地 LoRA Allowlist 校验下沉到共享管理层，封堵 gRPC LoadLora 绕过 HTTP 路径策略；KServe 则修复适配器名称清洗后的挂载路径碰撞，避免不同名称指向同一权重或让 Deployment 被拒绝。",
+      "judgment": "适配器身份不能由未经规范化的用户输入或最终目录名隐式决定。入口校验、Canonical Path、唯一 ID、挂载路径和模型注册表必须使用同一套不可碰撞映射。",
+      "sources": [
+        {
+          "name": "vLLM PR #53756",
+          "url": "https://github.com/vllm-project/vllm/pull/53756"
+        },
+        {
+          "name": "KServe PR #6085",
+          "url": "https://github.com/kserve/kserve/pull/6085"
+        }
+      ]
+    },
+    {
+      "title": "SGLang 开始向 Router 发布真实 Scheduler Load",
+      "summary": "新合入的可选 ZMQ PUB Socket 发布运行请求、等待请求、Token 占用与总 Token 容量，弥补 Router 侧 In-flight 计数看不到其他 Router、直连客户端和真实 KV 压力的问题；消费端将另行合入。",
+      "judgment": "Cache-aware Routing 不能只看本地请求计数。真正可用的代价函数应同时包含队列、KV 占用、Prefix 命中和数据传输，但当前只完成生产端，暂不应视为端到端功能。",
+      "sources": [
+        {
+          "name": "SGLang PR #34608",
+          "url": "https://github.com/sgl-project/sglang/pull/34608"
+        }
+      ]
+    },
+    {
+      "title": "SGLang 修正常驻权重场景的 KV Cache 显存核算",
+      "summary": "IPC Weight Cache Daemon 在 Engine 启动前已占用显存，旧逻辑却基于剩余空闲显存再次估算 KV 容量，可能过度分配并在 CUDA Graph Capture 时 OOM；修复把 Rank-local 常驻权重字节计入分布式最小值计算。",
+      "judgment": "显存预算必须按所有权核算，而不是只读取某一时刻的 Free Memory。权重 Daemon、Draft Model、CUDA Graph、KV 与临时 Workspace 都应进入同一张启动预算表。",
+      "sources": [
+        {
+          "name": "SGLang PR #34053",
+          "url": "https://github.com/sgl-project/sglang/pull/34053"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "最近 24 小时没有新的 vLLM 或 SGLang 稳定版，但主干快速改变了运行时边界：MRV2 成为默认路径，Renderer 并行预热因 Fork 死锁被撤销，LoRA 路径校验被统一到共享层；SGLang 则同时推进真实负载发布和常驻权重显存核算。这些变化的共同点不是 Kernel，而是状态由谁创建、谁计量、谁验证、谁对外暴露。",
+    "judgment": "为推理引擎建立“状态所有权矩阵”：进程、线程、模型权重、KV、Graph、Adapter、Queue 与 Socket 各自标明创建、共享、迁移、回收和观测责任。主干提交只用于预演或定向回补，不直接替换稳定版。",
+    "sources": [
+      {
+        "name": "vLLM MRV2 默认切换",
+        "url": "https://github.com/vllm-project/vllm/pull/53183"
+      },
+      {
+        "name": "vLLM Renderer 死锁回退",
+        "url": "https://github.com/vllm-project/vllm/pull/54023"
+      },
+      {
+        "name": "SGLang Load Publisher",
+        "url": "https://github.com/sgl-project/sglang/pull/34608"
+      },
+      {
+        "name": "SGLang KV 显存核算",
+        "url": "https://github.com/sgl-project/sglang/pull/34053"
+      }
+    ]
+  },
+  "backend": {
+    "content": "KServe 接收了 KernelCache 的 MCV 初始代码，包括从 vLLM 识别和抽取 Kernel Cache、预检、构建缓存容器镜像以及 Docker/Podman/Buildah 路径；这仍是功能交付的一部分，并非已发布版本。Kueue 的 KEP 则把配额释放从单一 Feature Gate 转为全局 quotaReleaseStrategy 配置，目的是在 Topology Aware Scheduling 场景中让配额持有到 Pod 真正终止，避免账面资源已释放但节点硬件仍被占用。最近 24–48 小时没有新的 Go 或 Rust 稳定版本。",
+    "judgment": "Kernel Cache 应被视为有版本、架构和驱动约束的构建工件；队列配额则必须与物理终止状态对齐。两者都需要生命周期控制，不能只靠控制面对象已更新就假设资源已可复用。",
+    "sources": [
+      {
+        "name": "KServe KernelCache MCV",
+        "url": "https://github.com/kserve/kserve/pull/5590"
+      },
+      {
+        "name": "Kueue Quota Release Strategy KEP",
+        "url": "https://github.com/kubernetes-sigs/kueue/pull/13163"
+      },
+      {
+        "name": "KServe LoRA Mount Fix",
+        "url": "https://github.com/kserve/kserve/pull/6085"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "vLLM Renderer Warmup Fork Deadlock 复盘",
+      "summary": "PR 给出 H200 与 MI300 上相同的启动挂死、线程与 Fork 的交错位置，以及为何选择恢复同步预热。",
+      "judgment": "适合作为并行启动优化的反例教材；上线门禁要有超时、进程栈和硬件矩阵，而不只是单机启动成功。",
+      "sources": [
+        {
+          "name": "vLLM PR #54023",
+          "url": "https://github.com/vllm-project/vllm/pull/54023"
+        }
+      ]
+    },
+    {
+      "title": "SGLang Scheduler Load Publisher",
+      "summary": "定义独立 ZMQ Topic、固定 Wire Contract、端口解析、去重心跳、停滞队列采样和 Best-effort 故障策略。",
+      "judgment": "可直接参考其“真实负载信号与 KV Event 分离”的设计，但要等 Router Consumer 落地后再评估整体收益。",
+      "sources": [
+        {
+          "name": "SGLang PR #34608",
+          "url": "https://github.com/sgl-project/sglang/pull/34608"
+        }
+      ]
+    },
+    {
+      "title": "KServe KernelCache MCV",
+      "summary": "初始 CLI/API 覆盖 Cache 检测、抽取、预检、镜像构建与多容器工具回退，并加入单测和发布流水线。",
+      "judgment": "值得跟踪但尚不宜生产采用；下一步应验证 Cache Key 是否完整覆盖 GPU 架构、驱动、CUDA、Torch、模型和 Engine Commit。",
+      "sources": [
+        {
+          "name": "KServe PR #5590",
+          "url": "https://github.com/kserve/kserve/pull/5590"
+        }
+      ]
+    },
+    {
+      "title": "Kueue Quota Release Strategy KEP",
+      "summary": "提出 OnTermination 与 OnTerminalBestEffort 等策略，使不同集成在 TAS 环境下控制配额何时真正归还。",
+      "judgment": "AI 队列常见的“资源已释放但节点仍满”问题需要配置化策略与卡死 Pod 兜底，值得提前纳入容量模型。",
+      "sources": [
+        {
+          "name": "Kueue PR #13163",
+          "url": "https://github.com/kubernetes-sigs/kueue/pull/13163"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "最近 24–48 小时未核验到足够重大且有公司公告支持的推理基础设施融资或并购。更明确的产业信号来自工程边界：vLLM 在切换新运行器的同时补齐启动与协议一致性，SGLang 把真实队列和 KV 压力暴露给 Router，KServe 开始把 Kernel Cache 做成可分发工件，Kueue 则细化物理资源与配额释放的一致性。",
+    "judgment": "推理平台竞争正进入“状态治理”阶段。能够证明默认切换安全、缓存工件可追溯、适配器不可混淆、队列和物理资源一致的团队，更容易承接多租户生产负载。",
+    "sources": [
+      {
+        "name": "vLLM MRV2 Default",
+        "url": "https://github.com/vllm-project/vllm/pull/53183"
+      },
+      {
+        "name": "SGLang Load Publisher",
+        "url": "https://github.com/sgl-project/sglang/pull/34608"
+      },
+      {
+        "name": "KServe KernelCache MCV",
+        "url": "https://github.com/kserve/kserve/pull/5590"
+      },
+      {
+        "name": "Kueue Quota Strategy",
+        "url": "https://github.com/kubernetes-sigs/kueue/pull/13163"
+      }
+    ]
+  },
+  "actions": [
+    "在 vLLM Nightly 建立 MRV1/MRV2 显式双路径测试，记录每个模型和特性最终选中的 Runner，并比较启动、显存、吞吐和正确性。",
+    "为多模态引擎启动加入 5–10 分钟看门狗、进程栈采集和 H200/MI300 等硬件矩阵，禁止后台线程与 Fork 的未验证重叠。",
+    "统一 LoRA 的 Canonical Path、Allowlist、Adapter ID 与 Mount Path 生成规则，并对 HTTP、gRPC、PVC、S3、HF 全入口做碰撞测试。",
+    "验证 SGLang Weight Cache Daemon 场景的显存预算，把常驻权重、Draft、KV、CUDA Graph 与 Workspace 分项纳入启动日志。",
+    "在 Shadow Traffic 下对比 Router 本地 In-flight 与真实 Scheduler Load，等消费端完成后再调整负载和 Prefix 命中权重。",
+    "跟踪 KServe MCV 与 Kueue quotaReleaseStrategy，分别设计 Cache Key 完整性测试和 Pod 终止延迟下的配额压力测试。"
+  ]
+}
