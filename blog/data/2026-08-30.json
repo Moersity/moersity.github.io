@@ -1,0 +1,186 @@
+{
+  "date": "2026-08-30",
+  "title": "DCP 把 KV 传输推入布局优化，推测解码开始偿还随机状态债务",
+  "deck": "vLLM 与 SGLang 同时推进 DCP/P-D 数据路径，但更值得警惕的是：推测解码的随机流、跨 Rank 状态和外部缓存边界仍在暴露正确性缺口。",
+  "top_items": [
+    {
+      "title": "vLLM 为 MLA 模型补齐 NIXL P/D 的 DCP 支持",
+      "summary": "原有 NIXL P/D 路径假设 MLA KV 在 TP Rank 间完整复制，远端只需读取一次；DCP 会按 Block 跨 Rank 切分 KV。新主干改动把 DCP 逻辑注入现有传输抽象，使生产者与消费者按分片布局交换数据。",
+      "judgment": "DCP 不是单纯增加并行度，而是改变 KV 所有权和远端读取拓扑；上线门禁必须核对每个 Rank 的 Block Map、传输字节与重建结果。",
+      "sources": [
+        {
+          "name": "vLLM PR #50611",
+          "url": "https://github.com/vllm-project/vllm/pull/50611"
+        }
+      ]
+    },
+    {
+      "title": "SGLang 将 DCP1→DCP-N 的 KV 传输从逐 Token RDMA 改为连续块",
+      "summary": "DCP 的循环 Token 所有权使旧 Relayout 为每个 Token、每层产生一个 RDMA 描述符，瓶颈落在描述符而非带宽。修复先在 Prefill 侧收集所属 MLA Row，再让 Mooncake/NIXL 发送页级或更大的连续块。",
+      "judgment": "跨节点推理的关键指标应加入 RDMA Descriptor/Token 与平均 Transfer Size；只看链路 GB/s 会掩盖控制面提交开销。",
+      "sources": [
+        {
+          "name": "SGLang PR #35762",
+          "url": "https://github.com/sgl-project/sglang/pull/35762"
+        }
+      ]
+    },
+    {
+      "title": "两套引擎同时修复推测解码的随机状态正确性",
+      "summary": "vLLM MRV2 将 Draft 与 Target 的 Gumbel Noise Stream 解耦，避免拒绝重采样偏离目标分布；SGLang 则修复 Dspark/Dflash 在 TP>1 时各 Rank 独立采样导致状态分叉的问题。前者影响概率 Draft 模式，后者涉及跨 Rank 一致性。",
+      "judgment": "推测解码验收不能只比较接受率和吞吐，必须做分布一致性、Seed 可复现、跨 Rank Token/State Hash 与长序列漂移测试。",
+      "sources": [
+        {
+          "name": "vLLM PR #54282",
+          "url": "https://github.com/vllm-project/vllm/pull/54282"
+        },
+        {
+          "name": "SGLang PR #33614",
+          "url": "https://github.com/sgl-project/sglang/pull/33614"
+        }
+      ]
+    },
+    {
+      "title": "vLLM 修复 Mooncake 持久化错误 Mamba 边界状态",
+      "summary": "Mamba align 模式的 Block Table 稀疏且可变，旧路径按 Worker Snapshot 的位置保存状态，可能持久化 Null、已复用或推测阶段的临时 Block；外部 Prefix 命中后会恢复被污染的递归状态并产生异常输出。修复改为保存 Core 选中的精确物理 Block，并持有到所有 Rank 完成异步 Store。",
+      "judgment": "递归模型状态不能沿用 Append-only Attention KV 的位置假设；外部缓存必须把逻辑边界、物理 Block 生命周期和异步完成条件绑定。",
+      "sources": [
+        {
+          "name": "vLLM PR #51358",
+          "url": "https://github.com/vllm-project/vllm/pull/51358"
+        }
+      ]
+    },
+    {
+      "title": "SGLang 为超大 HiCache Host Pool 对齐分块注册",
+      "summary": "单次 cudaHostRegister 在大型 Host Pool 上可能不可行，而任意字节切块会让一个 Copy Page 跨两个注册区间，导致 cudaMemcpyBatchAsync 报错。新改动按逻辑 Copy Page 对齐分块、记录成功区间，并在失败或销毁时完整回滚。",
+      "judgment": "超大缓存池的容量上限同时受虚拟内存、Pinned Memory、注册粒度和复制页布局约束；应把注册 Chunk 与 Page Size 暴露为启动诊断数据。",
+      "sources": [
+        {
+          "name": "SGLang PR #36798",
+          "url": "https://github.com/sgl-project/sglang/pull/36798"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "最近 24 小时没有新的 vLLM 或 SGLang 稳定版，以上变化均位于主干。DCP 正同时改变 KV 的 Rank 所有权、源/目的布局、RDMA 描述符数量和 P/D 恢复过程；推测解码则暴露随机流复用与跨 Rank 决策不同步的统计正确性问题。Mooncake/Mamba 与 HiCache 的修复进一步表明，外部缓存的正确性取决于物理 Block 生命周期、请求边界和异步完成时序。",
+    "judgment": "建立统一的分布式状态校验层：为每步记录 Request ID、Seed/Philox Offset、Rank、KV Block Map、State Hash、RDMA Descriptor 和 Store Completion；性能数据与正确性数据必须来自同一 Trace。",
+    "sources": [
+      {
+        "name": "vLLM DCP MLA",
+        "url": "https://github.com/vllm-project/vllm/pull/50611"
+      },
+      {
+        "name": "SGLang DCP Packing",
+        "url": "https://github.com/sgl-project/sglang/pull/35762"
+      },
+      {
+        "name": "vLLM Spec Decode Fix",
+        "url": "https://github.com/vllm-project/vllm/pull/54282"
+      },
+      {
+        "name": "SGLang TP State Fix",
+        "url": "https://github.com/sgl-project/sglang/pull/33614"
+      },
+      {
+        "name": "vLLM Mamba State Fix",
+        "url": "https://github.com/vllm-project/vllm/pull/51358"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Kueue 的弹性 Job 实现继续落地：Pod Ungater 改用 admission.count 而不是静态 podset.count，避免部分扩容时放行超过实际配额的 Pod；另一个修复让只写在 limits 中的 GPU 等扩展资源也能被 Workload Indexer 识别。KServe 则把 LLMInferenceService 文档样例真正送入 API Server、CRD 校验与 Webhook Admission Chain，防止示例与当前存储版本漂移。最近 24–48 小时没有新的 Go 或 Rust 稳定版。",
+    "judgment": "声明式 AI 控制面的测试应覆盖真实 Admission 与资源记账，而不只是 YAML 解析；尤其要验证 requests/limits 差异、部分准入数量和 Webhook 默认化后的最终对象。",
+    "sources": [
+      {
+        "name": "Kueue Admission Count",
+        "url": "https://github.com/kubernetes-sigs/kueue/pull/14835"
+      },
+      {
+        "name": "Kueue Extended Resources",
+        "url": "https://github.com/kubernetes-sigs/kueue/pull/14808"
+      },
+      {
+        "name": "KServe Sample Admission Tests",
+        "url": "https://github.com/kserve/kserve/pull/6039"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "vLLM Probabilistic Spec Decode Correctness Fix",
+      "summary": "PR 解释了 Draft 与 Target 共用同一 Gumbel Noise 时，条件分布如何系统性低估 Draft 排名靠前但未获胜的 Token。",
+      "judgment": "适合作为推测解码统计验收的最小案例；应把输出分布检验加入回归，而不是只断言 Token 合法。",
+      "sources": [
+        {
+          "name": "vLLM PR #54282",
+          "url": "https://github.com/vllm-project/vllm/pull/54282"
+        }
+      ]
+    },
+    {
+      "title": "SGLang DCP KV Packing",
+      "summary": "展示循环 DCP Ownership 如何把连续 KV 变成 Tokens×Layers 级描述符，并通过源侧 Gather 恢复大块 RDMA。",
+      "judgment": "可直接借鉴其 Descriptor-bound 诊断方法，但 DSPARK 支持仍留待后续，不能视为全路径完成。",
+      "sources": [
+        {
+          "name": "SGLang PR #35762",
+          "url": "https://github.com/sgl-project/sglang/pull/35762"
+        }
+      ]
+    },
+    {
+      "title": "Mooncake Mamba Boundary State 复盘",
+      "summary": "从稀疏可变 Block Table、物理 Block 复用到异步 Store 生命周期，完整解释为何合法 Prefix Hash 仍可能命中有毒状态。",
+      "judgment": "值得转化为所有外部 KV/State Store 的一致性测试模板：保存前、传输中、释放后与再次命中都要校验。",
+      "sources": [
+        {
+          "name": "vLLM PR #51358",
+          "url": "https://github.com/vllm-project/vllm/pull/51358"
+        }
+      ]
+    },
+    {
+      "title": "KServe 文档样例 Admission 测试",
+      "summary": "把文档中的 LLMInferenceService 样例提交给真实 API Server，并执行 CRD Schema、Validation Rule、Webhook 与存储版本检查。",
+      "judgment": "成本低、收益高，适合复制到内部 Operator：文档样例应成为兼容性测试输入，而不是静态附件。",
+      "sources": [
+        {
+          "name": "KServe PR #6039",
+          "url": "https://github.com/kserve/kserve/pull/6039"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "最近 24–48 小时未核验到足够重大、且有公司一手公告支持的推理基础设施融资或并购。更明确的工程投资方向是：DCP/P-D 正把优化重心从单机 Kernel 推向 KV Relayout、远端描述符和状态重建；与此同时，推测解码和递归模型缓存要求平台证明统计分布与跨 Rank 状态的一致性，而不只是提供更高 Tokens/s。",
+    "judgment": "能同时量化数据移动成本和证明状态正确性的团队，将比只展示峰值吞吐的方案更容易进入多租户生产；可观测的状态协议会成为平台能力的一部分。",
+    "sources": [
+      {
+        "name": "vLLM DCP MLA",
+        "url": "https://github.com/vllm-project/vllm/pull/50611"
+      },
+      {
+        "name": "SGLang DCP Packing",
+        "url": "https://github.com/sgl-project/sglang/pull/35762"
+      },
+      {
+        "name": "vLLM Spec Decode",
+        "url": "https://github.com/vllm-project/vllm/pull/54282"
+      },
+      {
+        "name": "vLLM Mamba Store",
+        "url": "https://github.com/vllm-project/vllm/pull/51358"
+      }
+    ]
+  },
+  "actions": [
+    "为 DCP/P-D Trace 增加 Rank Block Map、RDMA Descriptor 数、平均块大小与 KV 重建 Hash，并与 TTFT/TPOT 同步采集。",
+    "对概率推测解码执行固定 Seed 的分布检验，分别覆盖单卡、TP、多 Draft 长度、拒绝重采样和跨 Rank 状态一致性。",
+    "为 Mooncake 等外部状态缓存加入 Mamba/Hybrid 模型的 Save-Release-Hit 压力测试，强制触发物理 Block 复用和异步 Store。",
+    "在 HiCache 启动日志中输出 Host Pool、注册 Chunk、逻辑 Copy Page 与已锁页总量，并注入中途注册失败验证回滚。",
+    "用 Kueue 部分准入场景核对 admission.count、实际 Ungated Pod 与 GPU 配额，覆盖扩展资源仅出现在 limits 的 YAML。",
+    "把内部 Operator 文档样例接入真实 API Server 和 Webhook Admission 测试，阻止过期 API 版本与无效示例合入。"
+  ]
+}
