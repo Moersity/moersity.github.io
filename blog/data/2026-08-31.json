@@ -1,0 +1,182 @@
+{
+  "date": "2026-08-31",
+  "title": "推理入口开始补复杂度预算，通信与数值路径继续暴露静默风险",
+  "deck": "vLLM 与 SGLang 同时限制可被放大的请求字段；更深层的风险则来自 FP16 中间格式、CUDA Graph 显存预算，以及名为异步却仍阻塞或失去 Buffer 所有权的通信接口。",
+  "top_items": [
+    {
+      "title": "vLLM 限制 cache_salt 长度，封堵调度器 CPU 耗尽入口",
+      "summary": "cache_salt 原先没有上限，请求可携带超长字符串，并在单线程 EngineCore Scheduler 中反复执行序列化与 SHA-256，拖慢所有并发请求。主干现为六类 API 协议统一设置 1024 字符上限，并补齐 Pooling 入口的最小长度检查。",
+      "judgment": "多租户推理 API 需要字段级复杂度预算；长度很小不代表处理成本低，进入单线程 Scheduler、正则、哈希或 Tokenizer 的字段都应有硬上限。",
+      "sources": [
+        {
+          "name": "vLLM PR #54353",
+          "url": "https://github.com/vllm-project/vllm/pull/54353"
+        }
+      ]
+    },
+    {
+      "title": "SGLang 为 Stop String 与 Regex 设置请求上限",
+      "summary": "新验证把每个请求的 Stop String 与 Stop Regex 数量分别限制为 32，并把单个 Regex 限制为 256 个 UTF-8 字节；校验位于 SamplingParams.normalize，覆盖所有请求入口，越界返回 HTTP 400。",
+      "judgment": "停止条件会在逐 Token Decode 路径被反复匹配，其成本按输出长度放大。除了数量和字节数，还应对 Regex 编译和最坏匹配时间设置预算。",
+      "sources": [
+        {
+          "name": "SGLang PR #37029",
+          "url": "https://github.com/sgl-project/sglang/pull/37029"
+        }
+      ]
+    },
+    {
+      "title": "SGLang 修复 QuickReduce 把 BF16 All-reduce 变成非有限值",
+      "summary": "ROCm QuickReduce 为性能先把 BF16 转成 FP16，但 GPT-OSS 中超过 65,504 的数值会变成 Inf，并经量化 Codec 污染整块数据。修复对相关路径启用溢出钳制，并在 FP32 中缩放后再窄化，新增四卡回归测试。",
+      "judgment": "通信压缩的正确性测试必须覆盖真实激活值尾部，而不只是均匀随机小值；每层 All-reduce 前后应采样 Non-finite、最大绝对值和相对误差。",
+      "sources": [
+        {
+          "name": "SGLang PR #34484",
+          "url": "https://github.com/sgl-project/sglang/pull/34484"
+        }
+      ]
+    },
+    {
+      "title": "vLLM 收紧推测解码默认 CUDA Graph 尺寸，避免启动 OOM",
+      "summary": "此前为捕获更宽的 Uniform Decode Batch，默认 Graph Size 在 H200 上扩到 2176 和 6400 Token，导致 Full Graph Capture OOM，或把可用 KV Cache 压到无法启动。修复把自动生成尺寸限制在平台既有默认上限，更宽 Batch 回退 Eager。",
+      "judgment": "Graph Coverage 不是越大越好。默认值应先保证启动与 KV 容量，再通过显式配置换取特定 Batch 的 Full Graph 命中。",
+      "sources": [
+        {
+          "name": "vLLM PR #54418",
+          "url": "https://github.com/vllm-project/vllm/pull/54418"
+        }
+      ]
+    },
+    {
+      "title": "vLLM 修复名为 isend 的元数据发送仍阻塞且可能失去 Buffer",
+      "summary": "GroupCoordinator.isend_tensor_dict 过去用同步 Gloo Send 传元数据，大消息会等待对端 Recv 并在流水调度中死锁；Fire-and-forget 调用若丢弃 Handle，还可能让本地临时 Buffer 在后台复制完成前被释放。修复改为非阻塞发送并保留源 Buffer 生命周期。",
+      "judgment": "异步 API 的契约必须同时包含进度与所有权：调用不阻塞、Buffer 在完成前存活、异常可观察、Handle 被丢弃时仍有安全退路。",
+      "sources": [
+        {
+          "name": "vLLM PR #49274",
+          "url": "https://github.com/vllm-project/vllm/pull/49274"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "最近 24 小时没有新的 vLLM 或 SGLang 稳定版，以上变化均位于主干。入口层开始把 cache_salt、Stop String 和 Regex 当作可放大资源；运行层则连续修复 FP16 中间格式造成的数值污染、过度 CUDA Graph Capture 挤占 KV，以及异步通信中阻塞进度与 Buffer 生命周期不一致的问题。SGLang 还合入 Unified Cache 外部 Linker 的第一、二阶段契约，只完成 Cache Contract 和 Device Pool Assembly，后端接线仍将后续交付。",
+    "judgment": "给推理平台建立四张预算表：请求复杂度、数值范围、显存分区、异步 Buffer 生命周期。任何优化若无法在这四张表中说明上限、所有权和回退行为，都不应成为默认路径。",
+    "sources": [
+      {
+        "name": "vLLM Cache Salt Bound",
+        "url": "https://github.com/vllm-project/vllm/pull/54353"
+      },
+      {
+        "name": "SGLang Stop Bounds",
+        "url": "https://github.com/sgl-project/sglang/pull/37029"
+      },
+      {
+        "name": "SGLang QuickReduce Fix",
+        "url": "https://github.com/sgl-project/sglang/pull/34484"
+      },
+      {
+        "name": "vLLM Graph Size Fix",
+        "url": "https://github.com/vllm-project/vllm/pull/54418"
+      },
+      {
+        "name": "SGLang External Cache Contract",
+        "url": "https://github.com/sgl-project/sglang/pull/37091"
+      }
+    ]
+  },
+  "backend": {
+    "content": "KServe 修复 GPT-OSS 示例中已经被上游 vLLM 删除的 --disable-log-requests 参数；旧参数会让容器在 argparse 阶段直接退出，而简单替换为新参数还会反转原本的日志语义。Kueue 的 MultiKueue 修复则刷新 AdmissionCheck 的 observedGeneration，使状态能对应最新 Spec。最近 24–48 小时没有新的 Go 或 Rust 稳定版，也没有足够重要的语言级变化需要收录。",
+    "judgment": "Operator 示例与状态条件都是 API：示例必须绑定镜像真实版本执行启动测试；Controller Status 必须携带正确 Generation，避免自动化基于陈旧状态继续推进。",
+    "sources": [
+      {
+        "name": "KServe PR #6037",
+        "url": "https://github.com/kserve/kserve/pull/6037"
+      },
+      {
+        "name": "Kueue PR #14838",
+        "url": "https://github.com/kubernetes-sigs/kueue/pull/14838"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "SGLang Unified Cache External Linker Contract",
+      "summary": "第一阶段定义组件级 Transfer/Load 生命周期、可恢复 Prefix 元数据和远端去重状态；第二阶段加入可复用 Device Pool View 与 DSA/DeepSeek V4 Pool Assembly。",
+      "judgment": "值得跟踪其接口边界，但当前只是系列前两步，Linker Wiring 与 Backend 尚未完成，不能按可用外部缓存功能部署。",
+      "sources": [
+        {
+          "name": "SGLang PR #37091",
+          "url": "https://github.com/sgl-project/sglang/pull/37091"
+        },
+        {
+          "name": "SGLang PR #37098",
+          "url": "https://github.com/sgl-project/sglang/pull/37098"
+        }
+      ]
+    },
+    {
+      "title": "vLLM Async Metadata Send 复盘",
+      "summary": "PR 同时说明 Gloo Rendezvous 阈值如何让名义上的 isend 阻塞，以及临时元数据 Buffer、非 CUDA Device Tensor 在后台发送中的生命周期缺口。",
+      "judgment": "可作为分布式通信封装的代码审查模板：Progress、Ownership、Record Stream、Handle Retention 和 Teardown 缺一不可。",
+      "sources": [
+        {
+          "name": "vLLM PR #49274",
+          "url": "https://github.com/vllm-project/vllm/pull/49274"
+        }
+      ]
+    },
+    {
+      "title": "vLLM ROCm Dual-stream Decode with HIP Graphs",
+      "summary": "该主干优化恢复双流 Decode，但在 Routed Expert 输入未量化、Hidden State 与 Shared Expert 共享同一 Tensor 时禁用，以避开跨流读写竞争。",
+      "judgment": "多流优化必须按 Tensor Alias 关系门控，而不能只按模型名或硬件启用；建议加入数据指针与 Stream 事件诊断。",
+      "sources": [
+        {
+          "name": "vLLM PR #52033",
+          "url": "https://github.com/vllm-project/vllm/pull/52033"
+        }
+      ]
+    },
+    {
+      "title": "SGLang QuickReduce 四卡数值回归",
+      "summary": "覆盖低值、普通值、总和超过 FP16 范围以及单输入超过范围的案例，直接针对压缩 All-reduce 的溢出边界。",
+      "judgment": "建议复用测试思想到 FP8/FP4 与自定义 Collective：输入分布必须包含极值和非有限传播路径。",
+      "sources": [
+        {
+          "name": "SGLang PR #34484",
+          "url": "https://github.com/sgl-project/sglang/pull/34484"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "最近 24–48 小时未核验到足够重大、且有公司一手公告支持的推理基础设施融资或并购。工程信号更清楚：开源引擎正在同时收紧不可信输入、修复数值与通信正确性，并把外部缓存能力拆成显式生命周期契约。生产竞争开始从功能列表转向“默认路径是否有界、可回退、可证明”。",
+    "judgment": "平台采购与投资尽调应要求三类证据：恶意或极端输入下的隔离、压缩与量化路径的误差分布、异步/多流路径的 Buffer 所有权与故障恢复；峰值吞吐只能排在其后。",
+    "sources": [
+      {
+        "name": "vLLM Cache Salt Security Fix",
+        "url": "https://github.com/vllm-project/vllm/pull/54353"
+      },
+      {
+        "name": "SGLang Stop Bounds",
+        "url": "https://github.com/sgl-project/sglang/pull/37029"
+      },
+      {
+        "name": "SGLang Unified Cache",
+        "url": "https://github.com/sgl-project/sglang/pull/37091"
+      },
+      {
+        "name": "vLLM Async Send",
+        "url": "https://github.com/vllm-project/vllm/pull/49274"
+      }
+    ]
+  },
+  "actions": [
+    "为所有推理 API 建立字段复杂度清单，限制 Salt、Stop、Regex、Logits Processor 与结构化输出 Schema，并在单线程 Scheduler 前拒绝越界请求。",
+    "在压缩 Collective 回归中加入真实激活值分位数、FP16/FP8 边界、Non-finite 传播和多卡误差对比。",
+    "把 CUDA Graph 占用、KV Cache 剩余量和 Eager 回退比例纳入启动报告，禁止默认 Capture Size 挤穿最低 KV 容量。",
+    "审计所有 isend/异步拷贝封装，确认元数据与数据 Buffer 在完成前被持有，并用延迟 Recv 注入测试死锁和提前释放。",
+    "跟踪 SGLang External Linker 后续 Wiring 与 Backend，在完整链路落地前仅做接口评审，不纳入生产路线。",
+    "将 KServe/内部 Operator 示例绑定镜像版本执行真实启动测试，并要求 Status observedGeneration 与当前 Spec 一致后再自动放量。"
+  ]
+}
