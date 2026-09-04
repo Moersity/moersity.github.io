@@ -1,0 +1,190 @@
+{
+  "date": "2026-09-04",
+  "title": "外部 KV 缓存走向闭环：链路、路由与失败边界同时补齐",
+  "deck": "SGLang 完成 Mooncake External Linker 端到端接线，并把路由策略和 P/D 启动失败显式化；vLLM 则在避开 Fork 竞态后重新引入渲染预热并发。",
+  "top_items": [
+    {
+      "title": "SGLang 完成非 UMBP Mooncake External Linker 端到端接线",
+      "summary": "第五个拆分 PR 把参数、注册表、Scheduler 生命周期和 Cache Pool 配置串成完整数据路径，并加入 GLM-5.2 与 DeepSeek-V4 的 Mooncake Direct Load-back KL 端到端测试。",
+      "judgment": "外部 KV 能力已从接口骨架进入可验证闭环；生产验证仍应覆盖模型、并行拓扑、缓存键和失败回退，而不能只依据单个 KL 阈值。",
+      "sources": [
+        {
+          "name": "SGLang PR #37381",
+          "url": "https://github.com/sgl-project/sglang/pull/37381"
+        }
+      ]
+    },
+    {
+      "title": "SGLang Router 拆分硬性资格过滤与软性评分",
+      "summary": "新接口分别定义 EligibilityFilter 和 ScoringPolicy：请求先通过严格的过载、本地在途量与 Prefix Cache 资格过滤，再由可加权的 Fused Score 选择候选 Worker，并在启动时验证策略配置。",
+      "judgment": "硬约束先于软排序能避免权重补偿把不合格实例重新选中；上线前必须验证过滤后空集合、默认配置兼容和权重极值。",
+      "sources": [
+        {
+          "name": "SGLang PR #37731",
+          "url": "https://github.com/sgl-project/sglang/pull/37731"
+        }
+      ]
+    },
+    {
+      "title": "SGLang 为 P/D 传输引擎初始化加入 60 秒默认截止时间",
+      "summary": "NIXL、Mooncake、Ascend 与 Mori 的初始化现在受统一 Deadline 保护，超时会返回带调用、参数和主机信息的 RuntimeError；超时可由 SGLANG_DISAGGREGATION_ENGINE_INIT_TIMEOUT 调整。",
+      "judgment": "把故障从 300 秒 Scheduler Watchdog 的进程终止前移为组件级可诊断错误，能显著改善 P/D 集群滚动发布和自动恢复。",
+      "sources": [
+        {
+          "name": "SGLang PR #37874",
+          "url": "https://github.com/sgl-project/sglang/pull/37874"
+        }
+      ]
+    },
+    {
+      "title": "vLLM 在规避 Fork 竞态后重新引入 Renderer Warmup 并发",
+      "summary": "此前因 SDK 模式下多线程与 Fork 重叠而回滚的预热优化，被调整为 Engine Core 进程创建后才启动后台 Warmup；PR 对音频生成 Smoke Test 做了超过 200 次重复验证，同时明确仍不能证明竞态绝对不存在。",
+      "judgment": "这是对上一轮回滚的实质修复，但并发初始化仍需同时覆盖 Fork、Spawn、CLI 与 SDK 路径，不能把高频 Smoke Test 当作竞态证明。",
+      "sources": [
+        {
+          "name": "vLLM PR #54557",
+          "url": "https://github.com/vllm-project/vllm/pull/54557"
+        }
+      ]
+    },
+    {
+      "title": "KServe KernelCache 从验证接口推进到证书校验与签名契约",
+      "summary": "继 Verifier Framework 后，KServe 主干加入证书模式的签名验证实现，并定义 Signer 接口与工厂；当前 PR 以单元测试和数据契约为主，尚未宣告完整运行时签名链路。",
+      "judgment": "信任链已越过纯接口阶段，但距离生产可用仍缺签名消费者、密钥轮换、工件身份绑定与端到端 Fail-closed 验证。",
+      "sources": [
+        {
+          "name": "KServe PR #6103",
+          "url": "https://github.com/kserve/kserve/pull/6103"
+        },
+        {
+          "name": "KServe PR #6118",
+          "url": "https://github.com/kserve/kserve/pull/6118"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "最近 24–48 小时没有值得单列的新稳定版，关键变化集中在主干工程闭环。SGLang 一边完成 External Linker 的端到端接线，一边用分层路由策略和传输初始化截止时间补齐控制面；HiCache 还新增 L3 Storage Prefetch 生命周期指标，并修正 Buffer 模式下 L2/L3 命中归因、陈旧 Decode Window 与 Write-through Eviction 的可观测性。vLLM 则把 Renderer Warmup 延后到 Engine Core 创建之后，减少 SDK 模式的多线程 Fork 风险。",
+    "judgment": "推理数据面要达到生产就绪，至少需要可验证的数据闭环、可解释的路由决策、有限的启动等待和跨层缓存观测；缺少任一项，性能优化都会在故障时变成黑盒。",
+    "sources": [
+      {
+        "name": "SGLang External Linker",
+        "url": "https://github.com/sgl-project/sglang/pull/37381"
+      },
+      {
+        "name": "SGLang Router Policies",
+        "url": "https://github.com/sgl-project/sglang/pull/37731"
+      },
+      {
+        "name": "SGLang Init Timeout",
+        "url": "https://github.com/sgl-project/sglang/pull/37874"
+      },
+      {
+        "name": "SGLang HiCache Metrics",
+        "url": "https://github.com/sgl-project/sglang/pull/37503"
+      },
+      {
+        "name": "vLLM Renderer Warmup",
+        "url": "https://github.com/vllm-project/vllm/pull/54557"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Kueue 的 DynamicQuotaOrchestration Alpha Feature Gate 已从 KEP 进入实现：ClusterQueue 与 Cohort 都开始消费 status.effectiveQuotas 并接入 Scheduling、Cache 和 Controller，相关 Metrics 仍在后续计划中；ElasticJob 也新增 Partial Scale-up 路径，使部分 Replica 可先扩容并继续探测完整规模。KServe 的证书验证与 Signer 契约则继续补齐 KernelCache 供应链。最近 24–48 小时没有需要纳入的 Go 或 Rust 稳定版。",
+    "judgment": "动态配额已经不只是设计文档，但仍是 Alpha 且缺完整指标；评估时应把状态写入者、配额收敛、部分扩容回退和可观测性作为一个控制回路测试。",
+    "sources": [
+      {
+        "name": "Kueue ClusterQueue Effective Quotas",
+        "url": "https://github.com/kubernetes-sigs/kueue/pull/15040"
+      },
+      {
+        "name": "Kueue Cohort Effective Quotas",
+        "url": "https://github.com/kubernetes-sigs/kueue/pull/15107"
+      },
+      {
+        "name": "Kueue ElasticJob Partial Scale-up",
+        "url": "https://github.com/kubernetes-sigs/kueue/pull/14937"
+      },
+      {
+        "name": "KServe Certificate Verification",
+        "url": "https://github.com/kserve/kserve/pull/6103"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "SGLang External Linker E2E",
+      "summary": "从参数接线到 Scheduler 生命周期、Cache Pool 和模型级 KL 测试，展示了外部 KV Linker 从拆分开发走向闭环验证的完整落点。",
+      "judgment": "适合转化为自有 P/D 平台的验收清单，并补充缓存命中、哈希一致性、超时、断链和回退指标。",
+      "sources": [
+        {
+          "name": "SGLang PR #37381",
+          "url": "https://github.com/sgl-project/sglang/pull/37381"
+        }
+      ]
+    },
+    {
+      "title": "可组合 Router 策略接口",
+      "summary": "EligibilityFilter、ScoringPolicy 与 Fused Score 把过载限制、在途量和 Prefix Cache 从单一算法拆成可组合策略。",
+      "judgment": "可借鉴为路由控制面的策略 ABI，但需要冻结优先级、空集合语义、配置兼容与决策追踪格式。",
+      "sources": [
+        {
+          "name": "SGLang PR #37731",
+          "url": "https://github.com/sgl-project/sglang/pull/37731"
+        }
+      ]
+    },
+    {
+      "title": "P/D Engine 初始化 Deadline",
+      "summary": "统一包装多种传输后端的初始化调用，并把模糊 Watchdog 终止转换为包含后端、参数与主机上下文的错误。",
+      "judgment": "这是低成本高收益的生产化模式；应进一步把 Deadline、阶段耗时和 RDMA 设备选择暴露为启动指标。",
+      "sources": [
+        {
+          "name": "SGLang PR #37874",
+          "url": "https://github.com/sgl-project/sglang/pull/37874"
+        }
+      ]
+    },
+    {
+      "title": "HiCache L3 生命周期指标",
+      "summary": "覆盖 Storage Prefetch 发起、完成、丢弃和跨层命中归因，并修复 Buffer 与 Write-through 路径中的观测盲区。",
+      "judgment": "外部缓存优化必须按请求生命周期而非单点计数；建议同步记录命中来源、等待时间、丢弃原因与最终 Token 复用量。",
+      "sources": [
+        {
+          "name": "SGLang PR #37503",
+          "url": "https://github.com/sgl-project/sglang/pull/37503"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "最近 24–48 小时未核验到足够重大且有公司一手公告支持的推理基础设施融资或并购。更可靠的产业信号来自项目演进：外部 KV 不再只是传输插件，而是同时要求端到端正确性、缓存信任链、可组合路由、有限失败时间和分层观测；云原生调度也开始把动态容量直接映射为有效配额。",
+    "judgment": "推理平台的差异化正在从单点吞吐转向可移植缓存、可信工件、策略化路由和可恢复失败。采购与自研评估应提高这些平台契约的权重，而不是只比较理想场景 Tokens/s。",
+    "sources": [
+      {
+        "name": "SGLang External Linker",
+        "url": "https://github.com/sgl-project/sglang/pull/37381"
+      },
+      {
+        "name": "KServe KernelCache Verification",
+        "url": "https://github.com/kserve/kserve/pull/6103"
+      },
+      {
+        "name": "SGLang Router Policies",
+        "url": "https://github.com/sgl-project/sglang/pull/37731"
+      },
+      {
+        "name": "Kueue Dynamic Quota",
+        "url": "https://github.com/kubernetes-sigs/kueue/pull/15040"
+      }
+    ]
+  },
+  "actions": [
+    "在预发环境跑通 Mooncake External Linker 的写入、回读、命中、断链和回退矩阵，同时比较 Token Hash、KL 与缓存生命周期指标。",
+    "把 Router 规则拆成硬性资格与软性评分两层，重点测试过滤后空集合、权重极值、默认配置兼容和每次决策的可解释日志。",
+    "为每种 P/D 传输后端设置分阶段初始化 Deadline，并记录 RDMA 设备选择、握手耗时、超时上下文和自动重试结果。",
+    "对 vLLM Renderer Warmup 分别运行 Fork、Spawn、CLI 与 SDK 压测，加入进程存活 Watchdog，避免用单一路径的高频 Smoke Test 替代竞态验证。",
+    "跟踪 KServe KernelCache 的 Signer Consumer、密钥轮换和 Fail-closed 集成，在端到端链路完成前不要把证书模式视为已生产可用。",
+    "在隔离集群开启 Kueue DynamicQuotaOrchestration，注入容量抖动与 ElasticJob 部分扩容，验证配额收敛、回退和缺失指标的补偿方案。"
+  ]
+}
