@@ -1,0 +1,182 @@
+{
+  "date": "2026-09-05",
+  "title": "CUDA Graph 的真正边界，是指针生命周期、跨 Rank 形状与隐式同步",
+  "deck": "vLLM 与 SGLang 的最新主干修复同时指向同一件事：图捕获不仅是 Kernel 优化，还必须冻结 Workspace、统一分布式形状，并清除热路径上的 Device Sync。",
+  "top_items": [
+    {
+      "title": "vLLM V2 把 Kernel Warmup 前移，避免 CUDA Graph 持有失效 Workspace 指针",
+      "summary": "旧顺序先捕获 Graph、后运行调度器真实形状的 Warmup；若 Workspace 随后扩容并替换 Tensor，已捕获 Graph 会保留被释放 Buffer 的指针，下一次 Replay 可能触发 Illegal Memory Access。修复把 V2 Warmup 移到 Capture 之前。",
+      "judgment": "Graph Capture 的稳定性依赖地址稳定，而不仅是 Shape 稳定。所有共享 Arena、Lazy Init 和按需扩容都应在首个 Capture 前完成并锁定。",
+      "sources": [
+        {
+          "name": "vLLM PR #55341",
+          "url": "https://github.com/vllm-project/vllm/pull/55341"
+        }
+      ]
+    },
+    {
+      "title": "vLLM 去掉 GDN CUDA Graph 元数据路径中的 Device-to-Host 同步",
+      "summary": "GDN 与 Short-conv Builder 曾通过 .cpu() 推导 Host 侧 Draft Token 数，导致整个 CUDA Stream 被排空；空闲 DP Rank 的 Dummy Step 也会反复走到这条路径。新实现改用已有的 Host Query Start Location 推导，并加测试禁止 Capture 路径出现 .cpu()。",
+      "judgment": "异步流水线里一次小型标量回读也可能成为全局栅栏。性能审计应搜索 .cpu()、item() 和隐式 Synchronize，而不只盯大 Tensor Copy。",
+      "sources": [
+        {
+          "name": "vLLM PR #55404",
+          "url": "https://github.com/vllm-project/vllm/pull/55404"
+        }
+      ]
+    },
+    {
+      "title": "SGLang 为 Rust 多模态入口建立跨图片、视频和音频的统一预算",
+      "summary": "Rust Ingress 现在同时执行总 Item、总 Byte 和分模态数量上限；Base64 在分配前预留预算，可信本地文件使用整请求预算，远端 I/O 仍受单来源上限，Python 配置也会传递到 Rust Server。",
+      "judgment": "多模态请求的资源预算必须跨模态聚合，否则攻击者可在各自合法的图片、视频和音频额度之间叠加放大内存。",
+      "sources": [
+        {
+          "name": "SGLang PR #37967",
+          "url": "https://github.com/sgl-project/sglang/pull/37967"
+        }
+      ]
+    },
+    {
+      "title": "vLLM Rust gRPC 前端补齐多模态 Remote Prefill 的元数据交接",
+      "summary": "Decode 端继续重建 Placeholder、Multimodal Range 与模型位置元数据，并按 UUID 或 mm_hash 匹配 Encoder Cache；它移除 Pixel Values 等 Encoder Input，却保留 image_grid_thw 等生产端元数据，同时避免 Engine Core 重复加载 Encoder Embedding。",
+      "judgment": "E/P/D 拆分不仅要搬 Prompt KV 和 Encoder Feature，还要定义元数据所有权与身份匹配；否则命中缓存仍可能生成错误位置或重复编码。",
+      "sources": [
+        {
+          "name": "vLLM PR #54814",
+          "url": "https://github.com/vllm-project/vllm/pull/54814"
+        }
+      ]
+    },
+    {
+      "title": "Kueue Dynamic Quota 进入 Capacity Discovery 第一阶段",
+      "summary": "DynamicQuotaOrchestrator 在 Alpha Feature Gate 下开始发现并聚合多个 CapacityProvider 的容量，过滤受编排的 Resource Flavor、应用 Multiplier，并把 Effective Capacity 与发现状态写入自身 Status；向 ClusterQueue 和 Cohort 传播属于后续阶段。",
+      "judgment": "这是从静态配额转向供应驱动调度的关键一步，但当前只完成发现与聚合，不能把它误写为端到端动态配额已经闭环。",
+      "sources": [
+        {
+          "name": "Kueue PR #15199",
+          "url": "https://github.com/kubernetes-sigs/kueue/pull/15199"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "最近 24–48 小时没有值得单列的 vLLM 或 SGLang 新稳定版，重要变化集中在主干正确性。vLLM 修复了 Capture 后 Workspace 扩容造成的悬空指针，并移除 GDN 元数据构建中的 Device Sync；SGLang 则让 DP Attention 各 Rank 使用全局最大 Prefix Length 选择相同 Full CUDA Graph Variant，避免 Rank-coupled Communication 遇到不同 Graph Topology。另一个 SGLang 修复为跨 Stream 搬运的 Diffusion Weight 调用 record_stream，防止 PyTorch Allocator 在 Compute 尚未完成时复用 Storage。",
+    "judgment": "CUDA Graph 上线检查应同时覆盖四层契约：地址生命周期、跨 Rank Shape/Variant 一致性、Stream 所有权和 Host/Device 同步点；只做数值回归无法捕获这些时序错误。",
+    "sources": [
+      {
+        "name": "vLLM Workspace Lifetime",
+        "url": "https://github.com/vllm-project/vllm/pull/55341"
+      },
+      {
+        "name": "vLLM GDN Device Sync",
+        "url": "https://github.com/vllm-project/vllm/pull/55404"
+      },
+      {
+        "name": "SGLang DP FullCG Coordination",
+        "url": "https://github.com/sgl-project/sglang/pull/37888"
+      },
+      {
+        "name": "SGLang Courier Tensor Lifetime",
+        "url": "https://github.com/sgl-project/sglang/pull/37965"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Kueue 同时推进两条 AI 调度路径：DynamicQuotaOrchestrator 完成 Capacity Discovery Phase 1；Topology Aware Scheduling 则允许 PodSet Grouping 与 Slicing 组合，使 LeaderWorkerSet 能在上层故障域内共置 Leader/Worker，并在主机层切分 Worker。KServe 修复 LLMInferenceServiceConfig Preset 对 baseRefs 的处理，让模板基于已经合并的 Spec 渲染，并把项目 Go Toolchain 升到 1.26。最近 24–48 小时没有需要单列的 Rust 稳定版。",
+    "judgment": "动态容量与多级拓扑必须和声明合并语义一起验收：调度器看到的 Effective Capacity、控制器渲染的最终 Spec、以及实际 Pod Placement 应能追溯到同一代配置。",
+    "sources": [
+      {
+        "name": "Kueue Capacity Discovery",
+        "url": "https://github.com/kubernetes-sigs/kueue/pull/15199"
+      },
+      {
+        "name": "Kueue Grouped PodSet Slicing",
+        "url": "https://github.com/kubernetes-sigs/kueue/pull/15111"
+      },
+      {
+        "name": "KServe Merged Preset Rendering",
+        "url": "https://github.com/kserve/kserve/pull/6126"
+      },
+      {
+        "name": "KServe Go 1.26 Upgrade",
+        "url": "https://github.com/kserve/kserve/pull/6127"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "CUDA Graph Workspace 生命周期回归案例",
+      "summary": "PR 给出了 Capture 后 Arena Replacement 如何产生悬空指针，并用 DeepSeek-V4-Flash、Full/Piecewise Graph 与多卡配置隔离验证修复。",
+      "judgment": "适合转化为 Graph Capture 启动门禁：Capture 后禁止会改变底层地址的 Resize，并记录所有 Arena 的 Pointer 与 Capacity。",
+      "sources": [
+        {
+          "name": "vLLM PR #55341",
+          "url": "https://github.com/vllm-project/vllm/pull/55341"
+        }
+      ]
+    },
+    {
+      "title": "多模态统一 Ingress Budget",
+      "summary": "实现覆盖总量、分模态、Base64 预分配、Local/Remote Source 差异和 Python-to-Rust 配置传递，可作为多模态入口的资源治理参考。",
+      "judgment": "建议复用其预算层次，并额外加入 Decode Pixel、Frame、Audio Duration、Download Time 和并发解码预算。",
+      "sources": [
+        {
+          "name": "SGLang PR #37967",
+          "url": "https://github.com/sgl-project/sglang/pull/37967"
+        }
+      ]
+    },
+    {
+      "title": "Remote Prefill 多模态元数据契约",
+      "summary": "展示 Rust gRPC Frontend 如何把原始 Media 预处理、Encoder Cache Identity、Prompt KV Transfer 和模型特定位置元数据组合起来。",
+      "judgment": "可据此设计 E/P/D Trace Schema，至少记录 Media Hash、Feature UUID、Placeholder Range、Position Metadata 与 KV Transfer ID。",
+      "sources": [
+        {
+          "name": "vLLM PR #54814",
+          "url": "https://github.com/vllm-project/vllm/pull/54814"
+        }
+      ]
+    },
+    {
+      "title": "Grouped PodSet Slicing 的多级拓扑测试",
+      "summary": "Kueue 用 LeaderWorkerSet 覆盖上层 Block 共置、下层 Host 切片、Best-fit、节点故障替换和 Preferred Topology 回退。",
+      "judgment": "这是 AI 训练与推理副本组做拓扑验收的实用测试矩阵，但应在真实 GPU、RDMA 与故障域标签上复测。",
+      "sources": [
+        {
+          "name": "Kueue PR #15111",
+          "url": "https://github.com/kubernetes-sigs/kueue/pull/15111"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "最近 24–48 小时未核验到足够重大、且有公司一手公告支持的推理基础设施融资或并购。更明确的工程趋势是 CUDA Graph 从单机加速技巧变成平台级生命周期协议：Workspace 地址、DP Rank Graph Variant、跨 Stream Tensor 所有权以及 Host/Device 同步都会直接决定集群的正确性和尾延迟；与此同时，Kueue 开始把外部容量提供者纳入配额控制回路。",
+    "judgment": "推理平台的护城河正进一步转向运行时契约与可验证控制面。评估供应商时，应要求展示 Graph 失效保护、跨 Rank 协调、Media Budget、缓存身份和动态容量收敛，而不仅是峰值吞吐。",
+    "sources": [
+      {
+        "name": "vLLM CUDA Graph Lifetime",
+        "url": "https://github.com/vllm-project/vllm/pull/55341"
+      },
+      {
+        "name": "SGLang FullCG Coordination",
+        "url": "https://github.com/sgl-project/sglang/pull/37888"
+      },
+      {
+        "name": "SGLang Media Budget",
+        "url": "https://github.com/sgl-project/sglang/pull/37967"
+      },
+      {
+        "name": "Kueue Capacity Discovery",
+        "url": "https://github.com/kubernetes-sigs/kueue/pull/15199"
+      }
+    ]
+  },
+  "actions": [
+    "为所有 CUDA Graph Capture 路径记录 Workspace Pointer、Capacity 和 Capture Epoch，并在 Capture 后的 Resize 或 Storage Replacement 上直接失败。",
+    "对推测解码和 DP Dummy Step 做隐式同步扫描，重点排查 .cpu()、item()、Host Scalar 读取和默认 Stream Barrier。",
+    "加入跨 DP Rank 的 Graph Variant 一致性断言，用不对称 Prefix Length、空 Rank 与超 Capture Capacity 场景验证回退。",
+    "为多模态入口统一配置总 Item、总 Byte、各模态数量、解码后 Pixel/Frame/Duration 和并发解码预算。",
+    "在 E/P/D Trace 中串联 Media Hash、Encoder Feature UUID、模型位置元数据与 Prompt KV Transfer ID，验证缓存命中时不重复编码。",
+    "在隔离集群测试 Kueue Capacity Discovery 与 Grouped Slicing，注入 CapacityProvider 不可用、容量抖动和节点故障，并明确 Phase 1 尚未传播配额的边界。"
+  ]
+}
