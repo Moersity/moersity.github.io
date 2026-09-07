@@ -1,0 +1,202 @@
+{
+  "date": "2026-09-07",
+  "title": "KV Offload 的正确性边界：只存真实写入、未来可达且仍有人等待的状态",
+  "deck": "vLLM 连续修复终止 Token、SWA 分段和异步取消三类 Offload 错误；SGLang 则把缓存路由升级为分桶策略，并定位 ROCm 权重加载的 Eviction Storm。",
+  "top_items": [
+    {
+      "title": "vLLM 修复三类会产生错误或无效 KV Offload 的生命周期边界",
+      "summary": "终止请求不再 Offload 最后一个尚未经过 Forward 的采样 Token Slot，避免后续 Hash 命中加载空白或被拒 Draft 的 KV；Chunked Prefill 改用 Prompt 最终可 Offload 长度判断 SWA Store Reachability；异步 Lookup 在 Flush 前会再次确认仍有活跃 Requester。",
+      "judgment": "一个可发布的 KV Block 必须同时满足三项：每个 Slot 已真实计算、Load 路径未来可达、且当前 Generation 仍有消费者。缺一项都应跳过存储或查询。",
+      "sources": [
+        {
+          "name": "vLLM Final Token Slot Fix",
+          "url": "https://github.com/vllm-project/vllm/pull/54288"
+        },
+        {
+          "name": "vLLM SWA Reachability Fix",
+          "url": "https://github.com/vllm-project/vllm/pull/54362"
+        },
+        {
+          "name": "vLLM Async Lookup Cleanup",
+          "url": "https://github.com/vllm-project/vllm/pull/55075"
+        }
+      ]
+    },
+    {
+      "title": "vLLM 在 Engine Handoff 前验证 Scale-out 多模态数据",
+      "summary": "Generate Route 过去信任客户端回传的 Grid、Field Layout、Placeholder Range、Sparse Mask 与 Cache Hash；篡改 Grid 可让 Pixel Tensor 与几何不一致并导致 GPU Illegal Memory Access。新路径逐项核对活动模型与 Tensor，并从序列化 Payload 自行计算 Cache Key。",
+      "judgment": "Render 与 Generate 分离后，中间 JSON 已是不可信协议消息。模型布局、Range 和 Cache Identity 必须在每次 Handoff 重建验证，不能信任客户端回显。",
+      "sources": [
+        {
+          "name": "vLLM PR #51898",
+          "url": "https://github.com/vllm-project/vllm/pull/51898"
+        }
+      ]
+    },
+    {
+      "title": "SGLang 避免在 ROCm 上原地 Pin 大型 Mmap Tensor，GLM-5.2 加载从数分钟降到约 40 秒",
+      "summary": "Safetensors 的 File-backed Page 被 HIP 注册为 Userptr 后，Page Cache 回收、Readahead 与 Munmap 会触发 KFD 暂停该进程的所有 GPU Queue。SGLang 在 ROCm 上把默认 Pinned Transfer Threshold 提到 4 GiB，让大型 H2D Copy 走 Staging Buffer；PR 的 4×MI355X 测试中最慢 Rank 从约 506 秒降至 40 秒。",
+      "judgment": "这不是 Copy Kernel 优化，而是 CPU VM、File Page Cache 与 GPU Driver 的交互。权重加载 Profiling 应同时采集 KFD Eviction Event、Rank Spread 和 GPU Queue Suspension。",
+      "sources": [
+        {
+          "name": "SGLang PR #37720",
+          "url": "https://github.com/sgl-project/sglang/pull/37720"
+        }
+      ]
+    },
+    {
+      "title": "SGLang Router 引入 Prefill/Decode 分桶与原生 KV Indexer Cache-aware 路由",
+      "summary": "JSON Bucket 可按 Worker、Token Range、Context Limit、SLO 与 Prefill Queue Limit 定义角色域；Prefill 和 Decode 在各自域中独立选候选，Cache Hit 先受 Bucket 约束再截断，Prefix Provider 可选择本地 Radix Tree 或带超时与并发上限的全局 KV Indexer。",
+      "judgment": "缓存亲和不能绕过容量与角色边界。分桶、Cache Candidate、Load Admission 和 Fallback 应按固定顺序组合，并记录每次决策分支。",
+      "sources": [
+        {
+          "name": "SGLang PR #38108",
+          "url": "https://github.com/sgl-project/sglang/pull/38108"
+        },
+        {
+          "name": "SGLang PR #38139",
+          "url": "https://github.com/sgl-project/sglang/pull/38139"
+        }
+      ]
+    },
+    {
+      "title": "SGLang 主采样器用 Gumbel-max 避开 Decode CPU Dispatch 瓶颈",
+      "summary": "主采样路径在默认开启的 SGLANG_OPT_USE_GUMBEL_SAMPLE 下改用 argmax(probs / Exp(1))，避开 torch.multinomial 的 Philox Offset Bookkeeping 与 Device-side Validity Assert；确定性 Seed 路径不变，关闭开关可回退。",
+      "judgment": "小模型 Decode 已越来越受 CPU Dispatch 限制，但 Gumbel-max 与 Multinomial 只保证分布等价，不保证相同随机序列；升级必须分别验证统计分布和确定性契约。",
+      "sources": [
+        {
+          "name": "SGLang PR #38117",
+          "url": "https://github.com/sgl-project/sglang/pull/38117"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "最近 24–48 小时没有值得单列的新稳定版，重要变化仍在主干。vLLM 除三项 KV Offload 修复外，还把 Adaptive Verification 暂时从 Kernel Warmup 中摘除，等 Graph Capture 内的 Cost Calibration 完成后再恢复，避免未初始化 Cost Table 触发 Assert；Scale-out Protocol 新增轻量 mm_metadata，使 Prefill 在已有 Encoder Cache Transfer 时不必再次携带 Pixel Values。SGLang 继续补 EPD Request Lifecycle 的 DP/TP Error Consensus 与清理，并开始按 Warmup Phase、Component 和 Layer Usage 记录 Diffusion Residency 数据，但这一层只测量、尚未改变 Placement。",
+    "judgment": "优化路径的共同规律是先定义状态机：Warmup 前后、Cache Staging/Commit、Request Generation 和跨 Rank Consensus 都要有明确阶段与不变量；性能改动不能跨越未初始化或已回收状态。",
+    "sources": [
+      {
+        "name": "vLLM Adaptive Verification Warmup",
+        "url": "https://github.com/vllm-project/vllm/pull/55455"
+      },
+      {
+        "name": "vLLM Multimodal Metadata",
+        "url": "https://github.com/vllm-project/vllm/pull/54659"
+      },
+      {
+        "name": "SGLang EPD Lifecycle",
+        "url": "https://github.com/sgl-project/sglang/pull/36944"
+      },
+      {
+        "name": "SGLang Residency Measurement",
+        "url": "https://github.com/sgl-project/sglang/pull/37916"
+      }
+    ]
+  },
+  "backend": {
+    "content": "最近 24–48 小时，KServe、Kueue、Go 与 Rust 的官方 Release 列表未显示值得纳入日报的新稳定发布；相关主干也没有比昨日动态配额、Topology Assignment 与 TrainJob Toleration 修复更重要的新增变化。今天不为完整性重复旧内容。",
+    "judgment": "低变化窗口应维持发布纪律：继续验证既有控制面改动的收敛与回归，不用依赖升级或文档更新填充日报。",
+    "sources": [
+      {
+        "name": "KServe Releases",
+        "url": "https://github.com/kserve/kserve/releases"
+      },
+      {
+        "name": "Kueue Releases",
+        "url": "https://github.com/kubernetes-sigs/kueue/releases"
+      },
+      {
+        "name": "Go Releases",
+        "url": "https://go.dev/doc/devel/release"
+      },
+      {
+        "name": "Rust Releases",
+        "url": "https://github.com/rust-lang/rust/releases"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "KV Offload 三类边界回归",
+      "summary": "三个 PR 分别覆盖 Store Watermark、SWA Store Horizon 与 Async Lookup Flush，可组合成完整的生成、Prefill、Abort 和 Cancel 生命周期测试。",
+      "judgment": "建议将其转化为 Offload Connector 的通用契约套件，并加入每 Block KV Hash、Store/Load Reachability 和 Generation ID 检查。",
+      "sources": [
+        {
+          "name": "Final Sampled Token",
+          "url": "https://github.com/vllm-project/vllm/pull/54288"
+        },
+        {
+          "name": "SWA Store Horizon",
+          "url": "https://github.com/vllm-project/vllm/pull/54362"
+        },
+        {
+          "name": "Async Lookup Flush",
+          "url": "https://github.com/vllm-project/vllm/pull/55075"
+        }
+      ]
+    },
+    {
+      "title": "ROCm File-backed H2D Eviction 诊断案例",
+      "summary": "PR 把异常加载延迟定位到 Mmap Page 注册、MMU Notifier 与 KFD Queue Suspension，并用 KFD SMI Event、Warm Cache Control 和 Rank Spread 排除常见误因。",
+      "judgment": "这是系统性能定位的优秀模板：先证明时间花在暂停而非 Copy，再修改 Driver Threshold，并保留 Operator Override。",
+      "sources": [
+        {
+          "name": "SGLang PR #37720",
+          "url": "https://github.com/sgl-project/sglang/pull/37720"
+        }
+      ]
+    },
+    {
+      "title": "Bucket-aware Cache Routing",
+      "summary": "把角色域、Token Range、SLO、容量、Cache Provider 和 Decode Policy 放进一个有验证与迁移说明的 Router Contract，并移除旧 cache_aware_zmq Policy。",
+      "judgment": "适合参考其控制面拆分，但 PR 的性能数据是 Simulator-relative 且不是精确 Head GPU Benchmark，不能直接外推到生产收益。",
+      "sources": [
+        {
+          "name": "SGLang PR #38108",
+          "url": "https://github.com/sgl-project/sglang/pull/38108"
+        }
+      ]
+    },
+    {
+      "title": "Diffusion Residency 的分阶段 Warmup 记录",
+      "summary": "按 Stage Setup、Component Use、Prefetch 与 Full-weight Transition 记录 Device Peak，并统计目标 Workload Iteration 和 Layer Use，为后续自动驻留 Planner 提供输入。",
+      "judgment": "当前只是四层堆栈的第一层测量能力；评估时应区分 Measurement、Planner、Apply/Rollback 与 Pipeline Containment，不能提前宣称自动放置已完成。",
+      "sources": [
+        {
+          "name": "SGLang PR #37916",
+          "url": "https://github.com/sgl-project/sglang/pull/37916"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "最近 24–48 小时未核验到足够重大且有公司一手公告支持的推理基础设施融资或并购。更明确的产业信号是缓存从容量资产升级为一致性协议：Block 是否真实计算、未来是否可达、消费者是否仍存活，以及路由是否在正确角色域中命中，都会决定缓存能否安全复用。",
+    "judgment": "外部 KV 的商业价值不能只按 Hit Rate 评估；应同时计入 Poisoned Hit、Unreachable Store、Cancelled Lookup、跨租户 Identity 和错误恢复成本。高命中率但弱状态契约的系统风险更大。",
+    "sources": [
+      {
+        "name": "vLLM Offload Slot Correctness",
+        "url": "https://github.com/vllm-project/vllm/pull/54288"
+      },
+      {
+        "name": "vLLM Async Lookup Lifecycle",
+        "url": "https://github.com/vllm-project/vllm/pull/55075"
+      },
+      {
+        "name": "SGLang Bucket Routing",
+        "url": "https://github.com/sgl-project/sglang/pull/38108"
+      },
+      {
+        "name": "vLLM Scale-out Validation",
+        "url": "https://github.com/vllm-project/vllm/pull/51898"
+      }
+    ]
+  },
+  "actions": [
+    "为 Offload Store Job 加入 Written Slot Watermark，终止请求按 num_tokens - 1 计算最后有效位置，并用 Spec Decode 拒绝 Draft 污染测试验证。",
+    "为混合 Full Attention/SWA 的 Chunked Prefill 建立 Completed、Sync Abort 与 Async Abort 三套 Store Reachability 回归。",
+    "在 Async Lookup Flush 前按 Request Generation 重新确认消费者，记录因 Cancel、Finish 或 Supersede 被丢弃的 Key 数量。",
+    "把 Scale-out Multimodal JSON 当作不可信输入，重验 Grid、Layout、Placeholder Range、Sparse Mask，并从 Tensor Payload 重算 Cache Key。",
+    "在 ROCm 权重加载 Profiling 中采集 KFD USERPTR Eviction、GPU Queue Suspension 与 Rank Spread，对比 Staging 和 Direct-registration 两条路径。",
+    "迁移 SGLang Router 时先替换已移除的 cache_aware_zmq Policy，再用 Bucket-incompatible 高排名 Cache Hit 验证候选过滤顺序。"
+  ]
+}
