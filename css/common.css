@@ -333,3 +333,35 @@ footer .nav-logo { color: var(--text); }
 @media (max-width: 800px) {
     html { background-image: url('../assets/meadow-background-640.webp'); }
 }
+
+/* Decorative motion stays behind the paper surface, without intercepting input. */
+.ambient-video {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0;
+    transition: opacity .8s ease;
+}
+.ambient-video.is-playing { opacity: 1; }
+.ambient-toggle {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 5;
+    min-height: 40px;
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+    font-size: .875rem;
+    cursor: pointer;
+}
+.ambient-toggle:hover { background: var(--surface); }
+@media (prefers-reduced-motion: reduce) {
+    .ambient-video, .ambient-toggle { display: none; }
+}

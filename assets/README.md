@@ -19,3 +19,7 @@ https://www.wix.com/demone2/verozstah
 ## Delivery variants
 
 Pages use local WebP files with responsive `srcset` variants; JPEG sources are retained for future edits. The cover has 640/1440px variants, interest images have 480/960/1440px variants, and the background uses 640px on narrow screens and 1280px on desktop. The cover is preloaded with matching responsive sizes; below-fold images remain lazy-loaded. No third-party image or font requests are needed to render these pages.
+
+## Motion background
+
+`meadow-background.mp4` is the 480p grass-loop video from the user-supplied Wix reference, downloaded from https://video.wixstatic.com/video/c837a6_e342688f1f0d49399e162c478fe727d3/480p/mp4/file.mp4 . It is served locally (about 735 KiB), muted and looped, only after initial page loading. Static WebP backgrounds remain available for reduced-motion, data-saving, no-JavaScript, and playback-failure cases.

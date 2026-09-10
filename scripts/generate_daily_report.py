@@ -99,7 +99,7 @@ def page_shell(title: str, body: str, prefix: str = "../../") -> str:
     return f"""<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="description" content="AI 推理系统、Golang、Rust 与 Kubernetes 技术日报"><title>{html.escape(title)} — Moersity</title>
-<link rel="stylesheet" href="{prefix}css/common.css"><link rel="stylesheet" href="{prefix}css/blog.css"></head>
+<link rel="stylesheet" href="{prefix}css/common.css"><link rel="stylesheet" href="{prefix}css/blog.css"><script src="{prefix}js/background.js" defer></script></head>
 <body><a class="skip-link" href="#main-content">跳转到正文</a><nav class="home-nav" aria-label="主导航"><a class="nav-meet" href="{prefix}contact.html">LET’S TALK</a><a class="nav-logo" href="{prefix}index.html" aria-label="Moersity 首页">Moersity</a><div class="nav-links"><a href="{prefix}blog/" aria-current="page">技术日报</a><a href="{prefix}about.html">关于</a><a href="{prefix}contact.html">联系</a></div></nav>{body}<footer><a class="nav-logo" href="{prefix}index.html">Moersity</a><div class="socials"><a href="https://github.com/Moersity" target="_blank" rel="noopener noreferrer">GitHub ↗</a><a href="mailto:lixiang0417.cq@gmail.com">Email ↗</a><a href="{prefix}blog/feed.xml">RSS ↗</a></div><p>© 2026 Moersity</p></footer></body></html>"""
 
 
