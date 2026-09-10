@@ -15,3 +15,7 @@ https://www.wix.com/demone2/verozstah
 ## Coordinated interest images
 
 `ski-editorial.jpg`, `cinema-editorial.jpg`, and `play-editorial.jpg` were generated with ImageGen for this site on 2026-09-10. They are illustrative imagery, not personal photographs. Each is 1536 × 1024, exported to JPEG for local delivery. Their shared direction is warm natural light, walnut/ivory/olive colors, restrained contrast, and editorial photography.
+
+## Delivery variants
+
+Pages use local WebP files with responsive `srcset` variants; JPEG sources are retained for future edits. The cover has 640/1440px variants, interest images have 480/960/1440px variants, and the background uses 640px on narrow screens and 1280px on desktop. The cover is preloaded with matching responsive sizes; below-fold images remain lazy-loaded. No third-party image or font requests are needed to render these pages.

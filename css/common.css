@@ -32,7 +32,7 @@ body {
 }
 
 html {
-    background:#737e6b url('../assets/meadow-background.jpg') center/cover fixed
+    background:#737e6b url('../assets/meadow-background-1280.webp') center/cover fixed
 }
 
 body::before {
@@ -327,4 +327,9 @@ footer .nav-logo { color: var(--text); }
     nav .nav-logo { width: 100%; text-align: center; }
     footer .nav-logo { width: auto; }
     .button { font-size: 1rem; padding: 11px 18px; }
+}
+
+/* The narrow decorative margins do not need a desktop-size background. */
+@media (max-width: 800px) {
+    html { background-image: url('../assets/meadow-background-640.webp'); }
 }
