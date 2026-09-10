@@ -1,189 +1,38 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Moersity — Backend Engineer · AI · Cloud Native</title>
-    <link rel="stylesheet" href="css/common.css">
-    <link rel="stylesheet" href="css/index.css">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Moersity 的个人主页：Golang 后端、云原生与 AI 基础设施，以及代码之外的生活。">
+<title>Moersity — Backend Engineer · AI · Cloud Native</title>
+<link rel="stylesheet" href="css/common.css"><link rel="stylesheet" href="css/index.css">
 </head>
-<body>
-
-<!-- Navigation -->
-<nav>
-    <a class="nav-logo" href="#">Moersity</a>
-    <div class="nav-links">
-        <a href="blog/">技术日报</a>
-        <a href="#stack">技术栈</a>
-        <a href="#interests">兴趣</a>
-        <a href="contact.html">联系</a>
-        <a href="about.html" class="btn-about">About Me</a>
-    </div>
-</nav>
-
-<!-- Hero -->
-<section class="hero">
-    <div class="hero-bg"></div>
-    <div class="hero-grid"></div>
-    <div class="hero-content">
-        <div class="hero-badge">
-            <span class="dot"></span>
-            专注 AI 基础设施与云原生后端
-        </div>
-        <h1>
-            用 Go 构建<br>
-            <span class="gradient">智能化云原生系统</span>
-        </h1>
-        <p class="hero-desc">
-            后端工程师，深耕 Golang 微服务与云原生架构。<br>
-            在 AI 浪潮中打造高性能、高可用的基础设施。
-        </p>
-        <div class="hero-cta">
-            <a href="blog/" class="cta-primary">阅读技术日报</a>
-            <a href="about.html" class="cta-primary">了解更多</a>
-            <a href="#interests" class="cta-secondary">探索我的世界 ↓</a>
-        </div>
-        <div class="stats">
-            <div class="stat">
-                <div class="stat-value">Go</div>
-                <div class="stat-label">主力语言</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value">AI</div>
-                <div class="stat-label">工作领域</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value">K8s</div>
-                <div class="stat-label">云原生运行时</div>
-            </div>
-        </div>
-    </div>
+<body><a class="skip-link" href="#main-content">跳转到正文</a>
+<nav class="home-nav" aria-label="主导航"><a class="nav-meet" href="contact.html">LET’S TALK</a><a class="nav-logo" href="index.html" aria-label="Moersity 首页">Moersity</a><div class="nav-links"><a href="blog/">技术日报</a><a href="about.html">关于</a><a href="contact.html">联系</a></div></nav>
+<main id="main-content">
+<section class="hero" aria-labelledby="hero-title">
+<div class="hero-copy"><p class="eyebrow hero-eyebrow">MOERSITY / ENGINEERING & LIFE</p><h1 id="hero-title">BUILDING<br>THOUGHTFUL<br>SYSTEMS</h1>
+<div class="hero-intro"><h2>用心构建，经得起时间的系统。</h2><p>我是 Moersity，一名后端工程师。用 Go 构建高性能服务，探索云原生与 AI 基础设施，也在代码之外，寻找生活的开阔与自由。</p></div></div>
+<figure class="hero-figure"><img src="assets/architecture-interior.jpg" alt="自然光下的暖木色空间、纸灯与皮革座椅" fetchpriority="high" width="2048" height="2048"><a class="button" href="blog/">阅读技术日报 <span aria-hidden="true">↗</span></a></figure>
 </section>
-
+<section class="section" id="journal"><div class="section-header"><p class="section-label">I. NOTES & PERSPECTIVES / 技术记录</p><a class="text-link" href="blog/">浏览所有日报 ↗</a></div><div class="intro-grid"><h2>从系统的细节，<br>理解技术的变化。</h2><div><p>持续记录 AI 推理系统、Golang、Rust 与 Kubernetes 的演进。关注性能、可用性与工程实践，把每天的技术变化，沉淀为构建系统时更扎实的判断。</p><a class="text-link" href="blog/feed.xml">订阅 RSS ↗</a></div></div></section>
 <hr class="divider">
-
-<!-- Tech Stack -->
-<section class="section fade-up" id="stack">
-    <div class="section-header">
-        <div class="section-label">What I Build With</div>
-        <h2 class="section-title">技术栈</h2>
-    </div>
-    <div class="stack-grid">
-        <div class="stack-card">
-            <div class="stack-icon">🐹</div>
-            <h3>Golang 后端</h3>
-            <p>高并发服务、gRPC / HTTP API、领域驱动设计</p>
-            <div class="stack-tags">
-                <span class="tag">Go</span>
-                <span class="tag">gRPC</span>
-                <span class="tag">Gin</span>
-                <span class="tag">Wire</span>
-            </div>
-        </div>
-        <div class="stack-card">
-            <div class="stack-icon">🔩</div>
-            <h3>微服务架构</h3>
-            <p>服务拆分、服务网格、分布式追踪、可观测性</p>
-            <div class="stack-tags">
-                <span class="tag">Istio</span>
-                <span class="tag">Envoy</span>
-                <span class="tag">OpenTelemetry</span>
-            </div>
-        </div>
-        <div class="stack-card">
-            <div class="stack-icon">☁️</div>
-            <h3>云原生 & DevOps</h3>
-            <p>容器编排、GitOps、基础设施即代码</p>
-            <div class="stack-tags">
-                <span class="tag">Kubernetes</span>
-                <span class="tag">Docker</span>
-                <span class="tag">Helm</span>
-                <span class="tag">Terraform</span>
-            </div>
-        </div>
-        <div class="stack-card">
-            <div class="stack-icon">🤖</div>
-            <h3>AI 基础设施</h3>
-            <p>模型服务、推理引擎、向量数据库、AI 工作流编排</p>
-            <div class="stack-tags">
-                <span class="tag">LLM Serving</span>
-                <span class="tag">RAG</span>
-                <span class="tag">MLOps</span>
-            </div>
-        </div>
-    </div>
-</section>
-
+<section class="section" id="stack"><div class="section-header"><p class="section-label">II. AREAS OF FOCUS / 技术栈</p><h2 class="section-title">构建的基石</h2></div>
+<div class="stack-grid">
+<article class="stack-card"><span class="stack-number">01</span><div><h3>Golang 后端</h3><p>高并发服务、gRPC / HTTP API 与领域驱动设计，让复杂业务拥有清晰、可靠的实现。</p><div class="stack-tags"><span class="tag">Go</span><span class="tag">gRPC</span><span class="tag">Gin</span><span class="tag">Wire</span></div></div></article>
+<article class="stack-card"><span class="stack-number">02</span><div><h3>微服务架构</h3><p>从服务拆分到分布式追踪，关注服务之间的协作，也关注系统整体的可观测性。</p><div class="stack-tags"><span class="tag">Istio</span><span class="tag">Envoy</span><span class="tag">OpenTelemetry</span></div></div></article>
+<article class="stack-card"><span class="stack-number">03</span><div><h3>云原生 & DevOps</h3><p>容器编排、GitOps 与基础设施即代码，让服务的交付和运行更稳定、更可控。</p><div class="stack-tags"><span class="tag">Kubernetes</span><span class="tag">Docker</span><span class="tag">Helm</span><span class="tag">Terraform</span></div></div></article>
+<article class="stack-card"><span class="stack-number">04</span><div><h3>AI 基础设施</h3><p>探索模型服务、推理引擎、向量数据库与 AI 工作流，让智能能力走向可靠的生产环境。</p><div class="stack-tags"><span class="tag">LLM Serving</span><span class="tag">RAG</span><span class="tag">MLOps</span></div></div></article>
+</div></section>
 <hr class="divider">
+<section class="section" id="interests"><div class="section-header"><div><p class="section-label">III. BEYOND CODE</p><h2 class="section-title">工作之外的世界</h2></div><a class="text-link" href="about.html">更多关于我 ↗</a></div>
+<div class="bento">
+<article class="bento-item"><img src="assets/ski-editorial.jpg" alt="晨光中安静的雪道与远山" loading="lazy" width="1536" height="1024"><div class="bento-overlay"><h3>01 / 滑雪</h3><p>粉雪、蓝天、风从耳边呼啸。在雪道上飞驰，感受最直接的自由。</p></div></article>
+<article class="bento-item"><img src="assets/cinema-editorial.jpg" alt="暖木色小影院与柔和灯光" loading="lazy" width="1536" height="1024"><div class="bento-overlay"><h3>02 / 电影</h3><p>诺兰的烧脑、是枝裕和的细腻。沉浸在光影故事中，经历另一种人生。</p></div></article>
+<article class="bento-item"><img src="assets/play-editorial.jpg" alt="自然光下木桌上的游戏手柄" loading="lazy" width="1536" height="1024"><div class="bento-overlay"><h3>03 / 魂类游戏</h3><p>在一次次失败后复盘、调整、再出发。Elden Ring · Sekiro · Dark Souls。</p></div></article>
 
-<!-- Interests — Bento Grid -->
-<section class="section fade-up" id="interests">
-    <div class="section-header">
-        <div class="section-label">Beyond Code</div>
-        <h2 class="section-title">工作之外的世界</h2>
-    </div>
-    <div class="bento">
-        <div class="bento-item b-skiing">
-            <img src="https://images.unsplash.com/photo-1551524559-8af4e6624178?w=1200&q=80"
-                 alt="滑雪" loading="lazy">
-            <div class="bento-overlay">
-                <h3>🎿 滑雪</h3>
-                <p>粉雪、蓝天、风从耳边呼啸——没有什么比在雪道上飞驰更自由的了</p>
-            </div>
-        </div>
-        <div class="bento-item b-movies">
-            <img src="https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1200&q=80"
-                 alt="电影" loading="lazy">
-            <div class="bento-overlay">
-                <h3>🎬 电影</h3>
-                <p>诺兰的烧脑、是枝裕和的细腻，沉浸在光影故事中</p>
-            </div>
-        </div>
-        <div class="bento-item b-gaming">
-            <img src="https://images.unsplash.com/photo-1542751371-adc38448a05e?w=1200&q=80"
-                 alt="魂类游戏" loading="lazy">
-            <div class="bento-overlay">
-                <h3>⚔️ 魂类游戏</h3>
-                <p>YOU DIED 是通往胜利的唯一路径。Elden Ring · Sekiro · Dark Souls</p>
-            </div>
-        </div>
-        <div class="bento-item b-code">
-            <img src="https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=1200&q=80"
-                 alt="编程" loading="lazy">
-            <div class="bento-overlay">
-                <h3>💻 Open Source</h3>
-                <p>相信开源的力量，业余时间也在持续贡献和学习</p>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- Quote -->
-<section class="quote-section fade-up">
-    <p class="quote-text">
-        好的系统和好的人生一样，<br>
-        都需要耐心、热情，和持续的重构。
-    </p>
-    <p class="quote-attr">— 写在某个深夜 debug 之后</p>
-</section>
-
-<!-- Footer -->
-<footer>
-    <div class="socials">
-        <a href="https://github.com/Moersity" target="_blank">GitHub</a>
-        <a href="mailto:lixiang0417.cq@gmail.com">Email</a>
-        <a href="contact.html">联系我</a>
-    </div>
-    <p>&copy; 2026 Moersity — Built with ❤️ &amp; ☕</p>
-</footer>
-
-<script>
-    const observer = new IntersectionObserver(
-        entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); }),
-        { threshold: 0.15 }
-    );
-    document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
-</script>
-
-</body>
-</html>
+</div><aside class="open-source-note"><p class="section-label">04 / OPEN SOURCE</p><p>相信开源的力量，在分享、贡献和持续学习中，把想法变成现实。</p><a class="text-link" href="https://github.com/Moersity" target="_blank" rel="noopener noreferrer">我的 GitHub ↗</a></aside></section>
+<section class="quote-section"><p class="section-label">A PERSONAL NOTE</p><div><p class="quote-text">好的系统和好的人生一样，<br>都需要耐心、热情，<br>和持续的重构。</p><p class="quote-attr">— 写在某个深夜 debug 之后</p></div></section>
+<section class="section conversation"><div><p class="section-label">IV. START A CONVERSATION</p><h2>从一个想法，<br>开始聊聊。</h2></div><div class="conversation-info"><p>技术交流、开源协作，或只是打个招呼。<br><a href="mailto:lixiang0417.cq@gmail.com">lixiang0417.cq@gmail.com</a></p><a class="button" href="contact.html">联系我 <span aria-hidden="true">↗</span></a></div></section>
+</main>
+<footer><a class="nav-logo" href="index.html">Moersity</a><div class="socials"><a href="https://github.com/Moersity" target="_blank" rel="noopener noreferrer">GitHub ↗</a><a href="mailto:lixiang0417.cq@gmail.com">Email ↗</a><a href="blog/feed.xml">RSS ↗</a></div><p>© 2026 Moersity</p></footer>
+</body></html>

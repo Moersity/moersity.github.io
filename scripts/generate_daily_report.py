@@ -100,7 +100,7 @@ def page_shell(title: str, body: str, prefix: str = "../../") -> str:
 <html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="description" content="AI 推理系统、Golang、Rust 与 Kubernetes 技术日报"><title>{html.escape(title)} — Moersity</title>
 <link rel="stylesheet" href="{prefix}css/common.css"><link rel="stylesheet" href="{prefix}css/blog.css"></head>
-<body><nav><a class="nav-logo" href="{prefix}">Moersity</a><div class="nav-links"><a href="{prefix}blog/">技术日报</a><a href="{prefix}about.html">About Me</a></div></nav>{body}</body></html>"""
+<body><a class="skip-link" href="#main-content">跳转到正文</a><nav class="home-nav" aria-label="主导航"><a class="nav-meet" href="{prefix}contact.html">LET’S TALK</a><a class="nav-logo" href="{prefix}index.html" aria-label="Moersity 首页">Moersity</a><div class="nav-links"><a href="{prefix}blog/" aria-current="page">技术日报</a><a href="{prefix}about.html">关于</a><a href="{prefix}contact.html">联系</a></div></nav>{body}<footer><a class="nav-logo" href="{prefix}index.html">Moersity</a><div class="socials"><a href="https://github.com/Moersity" target="_blank" rel="noopener noreferrer">GitHub ↗</a><a href="mailto:lixiang0417.cq@gmail.com">Email ↗</a><a href="{prefix}blog/feed.xml">RSS ↗</a></div><p>© 2026 Moersity</p></footer></body></html>"""
 
 
 def render_post(report: dict) -> str:
@@ -113,7 +113,7 @@ def render_post(report: dict) -> str:
         section("05", "产业趋势与投资信号", f'<p>{html.escape(report["industry"]["content"])}</p><p class="judgment">判断：{html.escape(report["industry"]["judgment"])}</p>' + sources_html(report["industry"]["sources"])),
         section("06", "行动建议", "<ol>" + "".join(f"<li>{html.escape(x)}</li>" for x in report["actions"]) + "</ol>"),
     ]
-    body = f'<main class="blog-shell"><header class="post-header"><div class="blog-kicker">推理系统技术日报 · {html.escape(day)}</div><h1>{html.escape(report["title"])}</h1><p class="post-deck">{html.escape(report["deck"])}</p></header><div class="report-grid">{"".join(blocks)}</div><a class="back-link" href="../">← 返回全部日报</a></main>'
+    body = f'<main class="blog-shell" id="main-content"><header class="post-header"><div class="blog-kicker">推理系统技术日报 · {html.escape(day)}</div><h1>{html.escape(report["title"])}</h1><p class="post-deck">{html.escape(report["deck"])}</p></header><div class="report-grid">{"".join(blocks)}</div><a class="back-link" href="../">← 返回全部日报</a></main>'
     return page_shell(report["title"], body)
 
 
@@ -121,7 +121,7 @@ def render_index(reports: list[dict]) -> str:
     cards = []
     for report in sorted(reports, key=lambda x: x["date"], reverse=True):
         cards.append(f'<a class="post-card" href="posts/{html.escape(report["date"])}.html"><div class="post-meta">{html.escape(report["date"])}</div><h2>{html.escape(report["title"])}</h2><p>{html.escape(report["deck"])}</p></a>')
-    body = f'<main class="blog-shell"><div class="blog-kicker">Inference Systems Briefing</div><h1 class="blog-title">推理系统<br>技术日报</h1><p class="blog-intro">每天筛选 AI 推理系统、Golang、Rust 与 Kubernetes 的关键变化。重工程判断、可落地实践和一手来源，不堆新闻。</p><div class="post-list">{"".join(cards)}</div></main>'
+    body = f'<main class="blog-shell" id="main-content"><div class="blog-kicker">Inference Systems Briefing</div><h1 class="blog-title">推理系统<br>技术日报</h1><p class="blog-intro">每天筛选 AI 推理系统、Golang、Rust 与 Kubernetes 的关键变化。重工程判断、可落地实践和一手来源，不堆新闻。</p><div class="post-list">{"".join(cards)}</div></main>'
     return page_shell("推理系统技术日报", body, prefix="../")
 
 

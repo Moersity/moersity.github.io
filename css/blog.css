@@ -1,12 +1,12 @@
 .blog-shell {
     width: min(920px, calc(100% - 2rem));
     margin: 0 auto;
-    padding: 8rem 0 5rem;
+    padding: 4rem 0 5rem;
 }
 
 .blog-kicker {
     color: var(--accent);
-    font-size: 0.78rem;
+    font-size: .875rem;
     font-weight: 700;
     letter-spacing: 0.14em;
     text-transform: uppercase;
@@ -38,7 +38,7 @@
 .report-section {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 1.15rem;
+    border-radius: 0;
 }
 
 .post-card {
@@ -51,12 +51,12 @@
 
 .post-card:hover {
     transform: translateY(-2px);
-    border-color: rgba(129, 140, 248, .35);
+    border-color: var(--accent);
 }
 
 .post-meta {
     color: var(--accent);
-    font-size: .8rem;
+    font-size: .875rem;
     font-variant-numeric: tabular-nums;
 }
 
@@ -95,7 +95,7 @@
 
 .section-number {
     color: var(--accent);
-    font-size: .75rem;
+    font-size: .875rem;
     font-weight: 700;
     letter-spacing: .14em;
 }
@@ -107,7 +107,7 @@
 
 .report-section p,
 .report-section li {
-    color: #d4d4d8;
+    color: var(--text);
     line-height: 1.85;
 }
 
@@ -122,7 +122,7 @@
 
 .report-section a,
 .source-list a {
-    color: #a5b4fc;
+    color: var(--accent);
     text-decoration-thickness: 1px;
     text-underline-offset: 3px;
 }
@@ -143,8 +143,8 @@
 .source-list a {
     padding: .35rem .65rem;
     border: 1px solid var(--border);
-    border-radius: 999px;
-    font-size: .78rem;
+    border-radius: 0;
+    font-size: .875rem;
     text-decoration: none;
 }
 
@@ -156,5 +156,37 @@
 }
 
 @media (max-width: 640px) {
-    .blog-shell { padding-top: 6.5rem; }
+    .blog-shell { padding-top: 3rem; }
+}
+
+.post-card{background:transparent;border-width:0 0 1px;padding:1.75rem 0}.post-card:hover{transform:none}.post-list{gap:0}.post-card h2{font-size:1.6rem;line-height:1.5}.report-section{background:transparent}.report-section a,.source-list a{overflow-wrap:anywhere}.blog-shell{width:min(920px,calc(100% - 48px))}.blog-title,.post-header h1{line-height:1.3}
+
+/* Dates form an index column; long reports retain a narrower measure. */
+.blog-shell { width: min(1040px, calc(100% - 80px)); padding-block: 64px 80px; }
+.blog-shell:has(.post-header) { max-width: 760px; }
+.blog-title { font-size: clamp(2.5rem, 5vw, 4.5rem); letter-spacing: -.02em; }
+.blog-intro { max-width: 40rem; }
+.post-card { display: grid; grid-template-columns: 120px 1fr; column-gap: 32px; padding-block: 30px; }
+.post-meta { grid-row: 1 / 3; padding-top: 5px; font-family: var(--serif); }
+.post-card h2 { font-size: clamp(1.25rem, 2vw, 1.65rem); margin: 0; }
+.post-card p { grid-column: 2; margin-top: 12px; font-size: .9375rem; line-height: 1.85; }
+.post-card:hover h2 { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 5px; }
+.post-header h1 { font-size: clamp(2rem, 3.8vw, 3.25rem); line-height: 1.45; letter-spacing: 0; }
+.post-deck { line-height: 1.95; }
+.report-grid { gap: 0; }
+.report-section { padding: 36px 0; border-width: 0 0 1px; }
+.report-section h2 { font-size: 1.6rem; margin: 12px 0 24px; }
+.report-section p, .report-section li { line-height: 2; }
+.report-section li + li { margin-top: 24px; }
+.report-section > p + p { margin-top: 14px; }
+.report-section strong { font-weight: 600; }
+.judgment { border-left: 2px solid #bac3aa; padding-left: 14px; margin-top: 12px; }
+.source-list { gap: 8px 16px; }
+.source-list a { border: 0; border-bottom: 1px solid var(--border); padding: 3px 0; }
+@media (max-width: 700px) {
+    .blog-shell { width: calc(100% - 40px); padding-block: 40px 56px; }
+    .post-card { grid-template-columns: 1fr; gap: 10px; }
+    .post-meta { grid-row: auto; padding: 0; }
+    .post-card p { grid-column: 1; margin-top: 0; }
+    .report-section { padding-block: 28px; }
 }

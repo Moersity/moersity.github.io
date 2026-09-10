@@ -7,21 +7,16 @@
     <link rel="stylesheet" href="css/common.css">
     <link rel="stylesheet" href="css/contact.css">
 </head>
-<body>
+<body><a class="skip-link" href="#main-content">跳转到正文</a>
 
-<nav>
-    <a class="nav-logo" href="index.html">Moersity</a>
-    <div class="nav-links">
-        <a href="index.html">首页</a>
-        <a href="about.html">About Me</a>
-    </div>
-</nav>
+<nav class="home-nav" aria-label="主导航"><a class="nav-meet" href="contact.html">LET’S TALK</a><a class="nav-logo" href="index.html" aria-label="Moersity 首页">Moersity</a><div class="nav-links"><a href="blog/">技术日报</a><a href="about.html">关于</a><a href="contact.html" aria-current="page">联系</a></div></nav>
 
+<main id="main-content">
 <!-- Hero -->
 <div class="contact-hero">
     <div class="contact-hero-bg"></div>
     <div class="contact-hero-content">
-        <h1>联系我 ✉️</h1>
+        <p class="eyebrow">START A CONVERSATION</p><h1>让想法，从对话开始。</h1>
         <p class="subtitle">
             无论是技术交流、项目合作，还是只想打个招呼，<br>
             都欢迎随时联系我。
@@ -40,7 +35,7 @@
         <div class="contact-card">
             <span class="card-icon">🐙</span>
             <h3>GitHub</h3>
-            <p><a href="https://github.com/Moersity" target="_blank">github.com/Moersity</a></p>
+            <p><a href="https://github.com/Moersity" target="_blank" rel="noopener noreferrer">github.com/Moersity</a></p>
         </div>
         <div class="contact-card">
             <span class="card-icon">📍</span>
@@ -57,28 +52,17 @@
             开源协作、技术分享也非常欢迎。
         </p>
         <a href="mailto:lixiang0417.cq@gmail.com" class="btn-email">
-            ✉️ 发送邮件
+            发送邮件 ↗
         </a>
         <span class="email-plain">lixiang0417.cq@gmail.com</span>
     </div>
 </section>
 
 <!-- Footer -->
-<footer>
-    <div class="socials">
-        <a href="https://github.com/Moersity" target="_blank">GitHub</a>
-        <a href="mailto:lixiang0417.cq@gmail.com">Email</a>
-    </div>
-    <p>&copy; 2026 Moersity — Built with ❤️</p>
-</footer>
+</main>
+<footer><a class="nav-logo" href="index.html">Moersity</a><div class="socials"><a href="https://github.com/Moersity" target="_blank" rel="noopener noreferrer">GitHub ↗</a><a href="mailto:lixiang0417.cq@gmail.com">Email ↗</a><a href="blog/feed.xml">RSS ↗</a></div><p>© 2026 Moersity</p></footer>
 
-<script>
-    const observer = new IntersectionObserver(
-        entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); }),
-        { threshold: 0.15 }
-    );
-    document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
-</script>
+
 
 </body>
 </html>

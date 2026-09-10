@@ -7,20 +7,15 @@
     <link rel="stylesheet" href="css/common.css">
     <link rel="stylesheet" href="css/about.css">
 </head>
-<body>
+<body><a class="skip-link" href="#main-content">跳转到正文</a>
 
-<nav>
-    <a class="nav-logo" href="index.html">Moersity</a>
-    <div class="nav-links">
-        <a href="index.html">首页</a>
-        <a href="contact.html">联系</a>
-    </div>
-</nav>
+<nav class="home-nav" aria-label="主导航"><a class="nav-meet" href="contact.html">LET’S TALK</a><a class="nav-logo" href="index.html" aria-label="Moersity 首页">Moersity</a><div class="nav-links"><a href="blog/">技术日报</a><a href="about.html" aria-current="page">关于</a><a href="contact.html">联系</a></div></nav>
 
+<main id="main-content">
 <!-- Hero -->
 <div class="about-hero">
     <div class="about-hero-inner">
-        <h1>Hi, 我是 Moersity 👋</h1>
+        <p class="eyebrow">THE PERSON BEHIND THE CODE</p><h1>Hi, 我是 Moersity。</h1>
         <p class="tagline">后端工程师 · Golang · 微服务 · 云原生 · AI</p>
         <p class="bio">
             白天用 Go 写高并发微服务，搭建云原生 AI 基础设施；<br>
@@ -32,21 +27,19 @@
 
 <!-- Hobbies -->
 <section class="about-section">
-    <div class="about-section-title">
-        <span class="icon">✦</span> 我的爱好
-    </div>
+    <h2 class="about-section-title">代码之外，保持好奇。</h2>
 
     <div class="hobbies">
 
         <!-- Skiing -->
         <div class="hobby-card">
             <div class="img-wrap">
-                <img src="https://images.unsplash.com/photo-1551524559-8af4e6624178?w=800&q=80"
-                     alt="雪山滑雪" loading="lazy">
+                <img src="assets/ski-editorial.jpg"
+                     alt="雪山滑雪" loading="lazy" width="1536" height="1024">
                 <div class="overlay"></div>
             </div>
             <div class="content">
-                <h3>🎿 滑雪</h3>
+                <h3>01 / 滑雪</h3>
                 <p>
                     冬天最期待的事就是上雪道。风从耳边呼啸而过、雪板切入粉雪的瞬间，
                     所有烦恼都被留在了山顶。从双板到单板，一直在挑战更陡的坡。
@@ -62,12 +55,12 @@
         <!-- Movies -->
         <div class="hobby-card">
             <div class="img-wrap">
-                <img src="https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&q=80"
-                     alt="电影院" loading="lazy">
+                <img src="assets/cinema-editorial.jpg"
+                     alt="电影院" loading="lazy" width="1536" height="1024">
                 <div class="overlay"></div>
             </div>
             <div class="content">
-                <h3>🎬 电影</h3>
+                <h3>02 / 电影</h3>
                 <p>
                     科幻、悬疑、文艺片都爱看。沉浸在光影故事里，是另一种旅行。
                     喜欢诺兰的叙事结构，也喜欢是枝裕和的细腻日常。
@@ -83,12 +76,12 @@
         <!-- Souls-like games -->
         <div class="hobby-card">
             <div class="img-wrap">
-                <img src="https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=800&q=80"
-                     alt="游戏手柄" loading="lazy">
+                <img src="assets/play-editorial.jpg"
+                     alt="游戏手柄" loading="lazy" width="1536" height="1024">
                 <div class="overlay"></div>
             </div>
             <div class="content">
-                <h3>⚔️ 魂类游戏</h3>
+                <h3>03 / 魂类游戏</h3>
                 <p>
                     "YOU DIED" 是通往胜利的必经之路。从《黑暗之魂》到《艾尔登法环》，
                     享受每一次死亡后复盘、调整策略、最终击败 Boss 的成就感。
@@ -104,14 +97,8 @@
     </div>
 </section>
 
-<footer>
-    <div class="socials">
-        <a href="https://github.com/Moersity" target="_blank">GitHub</a>
-        <a href="mailto:lixiang0417.cq@gmail.com">Email</a>
-        <a href="contact.html">联系我</a>
-    </div>
-    <p>&copy; 2026 Moersity — Built with ❤️</p>
-</footer>
+</main>
+<footer><a class="nav-logo" href="index.html">Moersity</a><div class="socials"><a href="https://github.com/Moersity" target="_blank" rel="noopener noreferrer">GitHub ↗</a><a href="mailto:lixiang0417.cq@gmail.com">Email ↗</a><a href="blog/feed.xml">RSS ↗</a></div><p>© 2026 Moersity</p></footer>
 
 </body>
 </html>
