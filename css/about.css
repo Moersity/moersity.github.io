@@ -122,3 +122,6 @@
 @media (max-width: 1000px) and (min-width: 601px) {
     .hobby-card .content { padding-top: 0; }
 }
+
+.hobby-image-link { display: block; height: 100%; }
+.hobby-image-link:hover img { filter: brightness(1.06); }

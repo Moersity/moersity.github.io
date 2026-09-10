@@ -1,0 +1,57 @@
+/* Interest journals share the site's paper, ink and natural materials. */
+.interest-nav { display: flex; justify-content: space-between; gap: 20px; padding: 24px 40px; font-size: .875rem; }
+.interest-nav > a { color: var(--text-muted); }
+.interest-nav > div { display: flex; gap: 24px; flex-wrap: wrap; }
+.interest-nav a { text-decoration: none; padding-block: 6px; }
+.interest-nav a:hover, .interest-nav a[aria-current] { text-decoration: underline; }
+.interest-cover { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; padding: 32px 40px 64px; }
+.interest-intro h1 { font-size: clamp(2.8rem, 4.8vw, 4.8rem); margin: 24px 0; line-height: 1.2; }
+.interest-deck { max-width: 36ch; font-size: 1.0625rem; color: var(--text-muted); line-height: 1.95; }
+.interest-cover figure img { width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; }
+figcaption { font-size: .8125rem; color: var(--text-muted); margin-top: 12px; }
+.chapter-index { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0 40px; border-block: 1px solid var(--border); }
+.chapter-index a { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px 20px; text-decoration: none; }
+.chapter-index a + a { border-left: 1px solid var(--border); }
+.chapter-index a:hover { background: var(--surface); }
+.chapter-index span { font-family: var(--serif); color: var(--text-muted); }
+.feature-story { display: grid; grid-template-columns: 1.15fr 1fr; gap: 30px 48px; padding: 64px 40px; border-bottom: 1px solid var(--border); scroll-margin-top: 20px; }
+.story-heading { grid-column: 1 / -1; }
+.story-heading h2, .film-entry h2 { font-size: clamp(2rem, 3vw, 3rem); margin: 12px 0; }
+.story-tags { font-size: .875rem; color: var(--text-muted); }
+.story-image img { width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: contain; }
+.story-body h3, .film-copy h3 { font-size: 1.5rem; margin-bottom: 18px; }
+.story-body > p, .film-copy p, .text-chapters p:not(.eyebrow) { line-height: 1.95; color: var(--text-muted); margin-bottom: 18px; }
+.reading-note { padding: 18px 0 0 18px; border-left: 2px solid #bac3aa; margin-top: 24px; }
+.reading-note p { font-size: .9375rem; color: var(--text-muted); margin-top: 8px; line-height: 1.85; }
+.closing-note { background: #e4e7d9; padding: 48px 40px; text-align: center; }
+.closing-note > p:last-child { font-family: var(--serif); font-size: clamp(1.5rem, 2.5vw, 2.4rem); line-height: 1.7; margin-top: 20px; }
+.interest-end { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 24px; padding: 40px; }
+.text-chapters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; padding: 0 40px 64px; }
+.text-chapters article { border-top: 1px solid var(--border); padding-top: 24px; }
+.text-chapters h2 { font-size: 1.75rem; margin: 18px 0 24px; }
+.film-list { padding: 0 40px 48px; }
+.film-entry { display: grid; grid-template-columns: 64px 1fr 1.5fr; gap: 32px; border-top: 1px solid var(--border); padding: 40px 0; }
+.film-number { font-family: var(--serif); font-size: 2.8rem; color: #8a917d; line-height: 1; }
+.film-copy .viewing-note { font-size: .9375rem; padding-left: 16px; border-left: 2px solid #bac3aa; }
+@media (max-width: 1000px) {
+    .interest-cover { gap: 28px; }
+    .feature-story { gap: 28px; }
+    .chapter-index a { font-size: .875rem; padding-inline: 12px; }
+    .film-entry { grid-template-columns: 44px 1fr; gap: 20px; }
+    .film-copy { grid-column: 2; }
+    .text-chapters { gap: 24px; }
+}
+@media (max-width: 800px) {
+    .interest-nav { padding: 20px 24px; flex-direction: column; gap: 8px; }
+    .interest-cover { grid-template-columns: 1fr; padding: 24px 24px 40px; }
+    .interest-deck { max-width: 100%; }
+    .chapter-index { margin: 0 24px; grid-template-columns: 1fr; }
+    .chapter-index a + a { border-left: 0; border-top: 1px solid var(--border); }
+    .chapter-index a { padding: 16px 0; justify-content: flex-start; font-size: 1rem; }
+    .chapter-index a span:last-child { margin-left: auto; }
+    .feature-story { grid-template-columns: 1fr; padding: 40px 24px; }
+    .text-chapters { grid-template-columns: 1fr; padding: 0 24px 32px; gap: 24px; }
+    .film-list { padding: 0 24px 24px; }
+    .closing-note, .interest-end { padding: 32px 24px; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
