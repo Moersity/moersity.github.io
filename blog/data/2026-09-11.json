@@ -1,0 +1,194 @@
+{
+  "date": "2026-09-11",
+  "title": "PD 配对从可用走向可证明：SMG 补齐协议、恢复与证据安全",
+  "deck": "SMG 连续补齐 P/D 协议兼容、Worker 重启后的 KV 身份刷新、KV 事件映射校验与六类拓扑测试；SGLang 和 Kueue 则继续收紧显存与动态配额边界。",
+  "top_items": [
+    {
+      "title": "SMG 将 P/D 配对升级为显式协议契约",
+      "summary": "SMG 先把 KV 传输协议与布局暴露为 Worker 标签，再让 Placement 只选择协议兼容的 Prefill/Decode 组合，并新增显式 SMG_PAIRING_PROTOCOL 上报。默认模式保持宽松兼容，Strict 模式会拒绝不匹配组合；混合 NIXL 与 Mooncake 的 2P2D 测试中，同协议请求成功，不兼容组合返回 503。",
+      "judgment": "分离式推理的可用性不能只由端点健康决定。协议、布局和能力版本必须进入调度契约，并在发起 KV 传输前失败，避免把配置错误变成长超时。",
+      "sources": [
+        {
+          "name": "SMG Worker KV Labels",
+          "url": "https://github.com/smg-project/smg/pull/2484"
+        },
+        {
+          "name": "SMG Protocol-aware Pairing",
+          "url": "https://github.com/smg-project/smg/pull/2486"
+        },
+        {
+          "name": "SMG Explicit Pairing Protocol",
+          "url": "https://github.com/smg-project/smg/pull/2504"
+        }
+      ]
+    },
+    {
+      "title": "SMG 在 Worker 恢复时刷新 KV Engine 身份",
+      "summary": "vLLM Mooncake Prefill Worker 以同一 URL 重启后会生成新的 kv_engine_id 和随机传输端口；若网关沿用旧身份，Decode 仍会连接已失效端口并可能长时间挂起。SMG 现在在 Failed 或 NotReady Worker 探活成功、重新晋升 Ready 前，通过 gRPC 重新读取身份并交给 Gateway。",
+      "judgment": "恢复判定必须同时验证网络存活和会话身份。凡是重启后会变化的传输 ID、Epoch 或能力集，都应成为 Ready 晋升的原子前置条件。",
+      "sources": [
+        {
+          "name": "SMG Refresh KV Identity on Recovery",
+          "url": "https://github.com/smg-project/smg/pull/2492"
+        }
+      ]
+    },
+    {
+      "title": "SMG 拒绝歧义 KV Store 事件，避免污染路由证据",
+      "summary": "部分 Producer 会省略被跳过 Block 的 Hash，却保留对应 Token；若按位置拼接，Hash 可能绑定到错误 Token。SMG 现在要求 block_size 大于零，且 Hash 数乘 Block Size 必须等于 Token 数；不满足时跳过该 Store 事件而不是整个请求，并且日志只记录计数、不暴露 Token。",
+      "judgment": "Prefix-aware Routing 的证据错误比证据缺失更危险。摄取层应宁可丢弃无法证明对齐的事件，也不要生成高置信度的错误缓存位置。",
+      "sources": [
+        {
+          "name": "SMG KV Event Mapping Guard",
+          "url": "https://github.com/smg-project/smg/pull/2495"
+        }
+      ]
+    },
+    {
+      "title": "SGLang 将 KV Canary Workspace 纳入显存预算",
+      "summary": "Eager Canary Plan 在 CUDA Graph Capture 后按剩余 KV 空间分配，旧路径未扣除目标与 Draft Model 的 Workspace，最坏可接近 1 GB 并在运行时 OOM。新实现计算已安装 Plan 的容量，取 Target/Draft 最大 Workspace 从 KV Pool 中预留；Canary 关闭时路径不变。",
+      "judgment": "显存容量规划必须覆盖 Graph 捕获之后才实例化的辅助 Workspace。上线前应把静态权重、KV、Graph、通信和动态算子空间做成统一账本。",
+      "sources": [
+        {
+          "name": "SGLang KV Canary Workspace Accounting",
+          "url": "https://github.com/sgl-project/sglang/pull/38596"
+        }
+      ]
+    },
+    {
+      "title": "Kueue 为动态配额补上跨 Provider 集成闭环",
+      "summary": "前一日报关注的 DynamicQuotaOrchestrator 比例分配核心，现已增加多 Provider 聚合与分发、容量变化后的再分配，以及 ClusterQueue 配额变化和新增对象的 Watch 集成测试。",
+      "judgment": "动态配额从算法进入可用控制面，关键不在首次计算，而在事件映射、持续收敛和多来源变化后的可重复结果；这次提交补上了此前最明显的验证缺口。",
+      "sources": [
+        {
+          "name": "Kueue DQO Integration Tests",
+          "url": "https://github.com/kubernetes-sigs/kueue/pull/15407"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "SMG 新增跨 SGLang、vLLM 与 TokenSpeed 的 P/D 拓扑测试套件，覆盖 1P1D、1P2D、2P1D、1P3D、3P1D、2P2D，并验证每条链路流量、约 3K Token KV 传输、16 并发隔离、多轮与流式清理、Worker 丢失和恢复。RL 控制面 M1 也已合并：功能默认关闭，提供独立的 Worker 发现、单引擎代理与有界并发 Fan-out。共享 Prefix Cache 的 Rust Radix Tree 数据结构同时落地，链式基准显示显著降低 Holder Block 内存并加快查询，但它尚未接入在线 Router，不能视为生产路由功能。SGLang 另将外部缓存 Linker 状态机迁移为面向 Rust NodeId 的后端无关操作，支持 Full 与 Full+SWA，Mamba 与部分取消回滚仍是已知限制。",
+    "judgment": "SMG 的进展重点不是单个 Feature，而是控制面契约开始同时覆盖发现、放置、传输、恢复和拓扑验证。下一阶段应把协议版本、身份 Epoch、缓存证据健康度纳入统一可观测面，并严格区分已合并的数据结构与已经接入生产路径的能力。",
+    "sources": [
+      {
+        "name": "SMG PD Topology Test Matrix",
+        "url": "https://github.com/smg-project/smg/pull/2464"
+      },
+      {
+        "name": "SMG RL Control Plane M1",
+        "url": "https://github.com/smg-project/smg/pull/2411"
+      },
+      {
+        "name": "SMG Radix Tree Core",
+        "url": "https://github.com/smg-project/smg/pull/2436"
+      },
+      {
+        "name": "SGLang Rust TreeCore Linker",
+        "url": "https://github.com/sgl-project/sglang/pull/37306"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Kueue 的 WaitForPodsReady 增加由 PodsReady/WaitForScheduling 条件触发的超时驱逐，可通过 WaitForPodsReadyUnscheduledTimeout 控制，避免已准入但长期未调度的 Workload 占住配额。KServe 修复 HTTPRoute 状态的读后写一致性问题：Controller 直接使用本轮已收集的 Route 计算 HTTPRoutesReady，避免 Gateway 尚未观察到对象时短暂误报 Ready。最近 24–48 小时 Go 与 Rust 官方发布列表没有新的稳定版本。",
+    "judgment": "云原生推理控制面要把“已写入对象”“下游已观察”“Pod 已调度”“服务可用”拆成不同状态；配额回收和 Ready 判定都应绑定真实下游进展，而不是 API 写入成功。",
+    "sources": [
+      {
+        "name": "Kueue Unscheduled Timeout Eviction",
+        "url": "https://github.com/kubernetes-sigs/kueue/pull/15402"
+      },
+      {
+        "name": "KServe HTTPRoutesReady Consistency",
+        "url": "https://github.com/kserve/kserve/pull/6164"
+      },
+      {
+        "name": "Go Release History",
+        "url": "https://go.dev/doc/devel/release"
+      },
+      {
+        "name": "Rust Releases",
+        "url": "https://github.com/rust-lang/rust/releases"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "SMG 协议感知 P/D 配对实现",
+      "summary": "从 Worker 标签生成、成员快照索引到 Placement 过滤和 503 失败语义，三组 PR 给出了完整的异构传输协议接入路径。",
+      "judgment": "可直接借鉴为推理网关的能力协商清单：协议、布局、版本、严格度、失败码和观测标签缺一不可。",
+      "sources": [
+        {
+          "name": "SMG Pairing",
+          "url": "https://github.com/smg-project/smg/pull/2486"
+        },
+        {
+          "name": "SMG Pairing Protocol",
+          "url": "https://github.com/smg-project/smg/pull/2504"
+        }
+      ]
+    },
+    {
+      "title": "SMG 多引擎六拓扑验收矩阵",
+      "summary": "同一套断言跨三种 Engine 与六种 P/D 组合运行，并纳入并发、长 KV、流式、多轮、失联和恢复。",
+      "judgment": "适合改造成内部 PD 发布门禁；应再叠加协议不匹配、身份轮换和传输层部分失败注入。",
+      "sources": [
+        {
+          "name": "SMG PD E2E Topologies",
+          "url": "https://github.com/smg-project/smg/pull/2464"
+        }
+      ]
+    },
+    {
+      "title": "KV 事件摄取的对齐不变量",
+      "summary": "SMG 用 Hash 数、Block Size 与 Token 数的严格等式识别歧义事件，并把错误隔离在单条事件边界。",
+      "judgment": "这是所有事件驱动缓存索引都值得加入的低成本守卫；同时应统计丢弃率并按 Producer 版本告警。",
+      "sources": [
+        {
+          "name": "SMG KV Event Guard",
+          "url": "https://github.com/smg-project/smg/pull/2495"
+        }
+      ]
+    },
+    {
+      "title": "SMG Rust Radix Tree 基准与边界",
+      "summary": "PR 固定的 1280 万 Holder Block 链式基准中，内存由每 Block 166.7 B 降到 26.9 B、查询 P50 从 917 ns 降到 292 ns；碎片化内部空洞的 P99 仍可能变差。",
+      "judgment": "值得复用其基准方法，但数字只代表数据结构微基准；等待 Service 与 Router 集成完成后再测端到端命中收益。",
+      "sources": [
+        {
+          "name": "SMG Radix Tree Core",
+          "url": "https://github.com/smg-project/smg/pull/2436"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "最近 24–48 小时未核验到足够重大、且有公司一手公告支持的推理基础设施融资或并购。更明确的产业信号来自工程侧：推理网关正从普通 L7 负载均衡器演进为协议与状态控制面，需要理解 KV 传输能力、P/D 拓扑、Worker 身份、缓存证据和训练后端控制。",
+    "judgment": "评估网关或调度平台时，应减少对单一吞吐数字的权重，转而验证异构协议共存、重启恢复时间、错误证据隔离、拓扑故障覆盖和控制操作的部分失败语义。",
+    "sources": [
+      {
+        "name": "SMG Protocol-aware Pairing",
+        "url": "https://github.com/smg-project/smg/pull/2486"
+      },
+      {
+        "name": "SMG Recovery Identity",
+        "url": "https://github.com/smg-project/smg/pull/2492"
+      },
+      {
+        "name": "SMG RL Control Plane",
+        "url": "https://github.com/smg-project/smg/pull/2411"
+      },
+      {
+        "name": "SGLang KV Workspace Accounting",
+        "url": "https://github.com/sgl-project/sglang/pull/38596"
+      }
+    ]
+  },
+  "actions": [
+    "在 SMG 测试环境开启严格 P/D 协议配对，混跑 NIXL 与 Mooncake，确认不兼容组合在传输前稳定返回明确的 503。",
+    "对 Prefill Worker 做同 URL 重启故障注入，记录 Ready 晋升、kv_engine_id 刷新和首个 Decode 恢复耗时，确保旧身份不再被引用。",
+    "为 KV Event 摄取增加按 Producer 版本拆分的歧义事件丢弃率指标，并用乱序、缺 Hash 和非整 Block Token 做回归测试。",
+    "把 SMG 六拓扑套件接入 PD 发布门禁，再加入协议不匹配、传输端口轮换和 Partial Transfer 三类故障。",
+    "审计推理显存预算是否包含 CUDA Graph 后创建的 Canary、Speculative Draft 与通信 Workspace，并为动态空间保留硬上限。",
+    "跟踪 SMG Radix Tree 后续 Service/Router 集成；在端到端命中率、调度时延和碎片化 P99 数据出现前，不把微基准收益外推到生产。"
+  ]
+}
