@@ -1,0 +1,206 @@
+{
+  "date": "2026-09-13",
+  "title": "把稀疏 KV 放到主机：HiSparse 成形，CUDA Graph 开始治理生命周期",
+  "deck": "vLLM 为 Sparse-MLA 建立 GPU 常驻页、Pinned Host Tier 与每请求 Hot Buffer，并补上 TP 共享和指标；SGLang 则收紧 Graph Executable 复用、借用内存碎片与 Rust TreeCore 的 SWA 语义。",
+  "top_items": [
+    {
+      "title": "vLLM HiSparse 建立主机常驻的 Sparse-MLA KV 层级",
+      "summary": "HiSparse 尽量让 KV 留在普通 GPU Cache，压力下把 Sparse-MLA Page 溢出到 Pinned Host Pool；Sparse Attention 的 Top-k Miss 只把选中的 Host Row 拉进每请求 GPU Hot Buffer，解析、替换和 LRU 更新都留在 GPU 并兼容 CUDA Graph。后续 PR 又把指标接入 KVConnectorStats，并让本机 TP Rank 通过单个 mmap Pool 共享复制的 Host Cache，由 Rank 0 写入、其他 Rank 等待 IPC Event。",
+      "judgment": "这不是传统整页 Offload，而是由 Sparse Attention 选择驱动的 Row 级热集。评估时必须同时观测 Host Lookup、Hot Hit、L3 Lookup、PCIe 流量和 P99 TPOT；TP 共享 PR 明确尚未完成生产规模大池与端到端模型验证。",
+      "sources": [
+        {
+          "name": "vLLM HiSparse Core",
+          "url": "https://github.com/vllm-project/vllm/pull/53781"
+        },
+        {
+          "name": "vLLM HiSparse Metrics",
+          "url": "https://github.com/vllm-project/vllm/pull/56061"
+        },
+        {
+          "name": "vLLM Shared TP Host Cache",
+          "url": "https://github.com/vllm-project/vllm/pull/56629"
+        }
+      ]
+    },
+    {
+      "title": "vLLM 复用 CUDA Graph，把 Elastic EP 切换停顿压到约 1–2 秒",
+      "summary": "NIXL EP 现在让已有 Rank 保留 Fused-MoE Runtime 与 CUDA Graph，新 Rank 在后台 Prepare 阶段完成 Warmup/Capture，Commit 只做短暂停顿。24 张 GB200、DeepSeek-V3、DP/EP 16→24→16 的一次测量中，停顿从 40.266/38.320 秒降到 1.019/1.895 秒；当前 Graph 复用仅覆盖 NIXL EP。",
+      "judgment": "弹性扩缩的关键不是总重配置时长，而是现有请求停止前进的 Commit Window。固定最大容量 Buffer 会让未屏蔽 Padding 的 Triton/CUTLASS Kernel 付出显著代价，需按实际 Expert Backend 单独验收。",
+      "sources": [
+        {
+          "name": "vLLM Elastic EP Graph Reuse",
+          "url": "https://github.com/vllm-project/vllm/pull/54985"
+        },
+        {
+          "name": "vLLM ROCm Elastic EP Deadlock Fix",
+          "url": "https://github.com/vllm-project/vllm/pull/56610"
+        }
+      ]
+    },
+    {
+      "title": "SGLang 将 CUDA Graph 去重与内存借用纳入生命周期管理",
+      "summary": "Graph Dedup Registration 不再实例化额外 Executable，而是直接在 Live Executable 上验证更新；签名去掉 Grid Size 与冗余 Kernel Name，失败更新保留原 Executable。Graph Pool Borrowing 则把状态收进 Runtime Resource，缓存 Free Run、预切可复用 Segment，并在 Replay 或 Teardown 前校验 Tensor Lifetime，避免小借用碎片化和越过安全重放窗口。",
+      "judgment": "Graph 优化不能只追求 Capture 数量，还要明确 Executable、借用 Tensor 和 Memory Segment 的共同所有权。两项 PR 只报告单元测试，未做完整模型吞吐，生产收益仍需真实 Shape 分布验证。",
+      "sources": [
+        {
+          "name": "SGLang Live Graph Executable Reuse",
+          "url": "https://github.com/sgl-project/sglang/pull/39176"
+        },
+        {
+          "name": "SGLang Graph Pool Borrowing",
+          "url": "https://github.com/sgl-project/sglang/pull/39177"
+        }
+      ]
+    },
+    {
+      "title": "SGLang Rust TreeCore 补齐 SWA Branching-point Cache",
+      "summary": "此前该能力只在 Python TreeCore 实现，Rust Adapter 因缺少字段而静默退化，既不报错也不缓存 Branching Point。新实现把 SWA Branch 长度、增量 Backup、Write-back 与 Buffer Mode 契约贯穿 Rust Core、Binding 和 Adapter；4×H200 的共享前缀实验中，Rust 路径 Cache Hit 从 36.6% 提升到 46.5%，请求率从 0.65 提升到 0.76 req/s，并与 Python 行为接近。",
+      "judgment": "并行重写的最大风险是接口返回默认值造成静默功能缺失。Python/Rust 双实现应共享契约测试，并用可识别的缓存命中指纹验证，而不只检查输出正确。",
+      "sources": [
+        {
+          "name": "SGLang Rust SWA Branch Cache",
+          "url": "https://github.com/sgl-project/sglang/pull/37584"
+        }
+      ]
+    },
+    {
+      "title": "vLLM 让 Sparse-MLA 同时启用 PCP 与 DCP，但 Decode 仍有通信税",
+      "summary": "Sparse Indexer 与 FlashMLA Sparse Backend 新增 DCP Gather 的 Prefill 路径，使 PCP 分摊 Prefill Query、DCP 分片 Decode KV 可以共存。GB200×4、GLM-5.3 上，PCP4DCP4 的 32K Prefill TTFT 相对 TP4 提升约 1.66 倍；但 Piecewise Decode 只有 TP4 的 0.22 倍输出吞吐，PR 指向未优化的 NCCL Ring All-reduce。",
+      "judgment": "组合并行能解决容量与 Prefill，但不自动改善 Decode。上线前应分别画出 Prefill TTFT、Decode TPOT 与每层 Collective，并等待 DCP Group 的定制 All-reduce 路径成熟。",
+      "sources": [
+        {
+          "name": "vLLM PCP+DCP Sparse-MLA",
+          "url": "https://github.com/vllm-project/vllm/pull/56157"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "SMG 最近 24–48 小时无重要合并变化，Release 仍停留在 v1.10.1；今天没有把尚未合并的 PR 当成已交付能力。值得跟踪的评审中改动包括：Worker Property Update 保留 KV Connector、Bootstrap Port、Pairing Protocol 与健康检查刷新后的 KV Engine ID；Cache-aware Policy 增加 Tree Match、Spill、Expected-wait Fallback 分支计数及 Match Ratio 直方图。现存重要 Issue 仍包括 Manual/Consistent-hashing 在 Routing-key Override 下的 Body RID 优先级，以及超长 Prompt 被错误映射为 500 而不是 400。",
+    "judgment": "SMG 当前的高价值工作集中在状态连续性与可观测性。Property Patch 不应重建并丢失数据面身份；Cache-aware Router 也必须能量化亲和命中被负载保护放弃的比例。上述两项仍是 Open PR，应等待合并和 GPU/E2E 证据后再纳入生产结论。",
+    "sources": [
+      {
+        "name": "SMG Preserve PD State PR",
+        "url": "https://github.com/smg-project/smg/pull/2516"
+      },
+      {
+        "name": "SMG Cache-aware Metrics PR",
+        "url": "https://github.com/smg-project/smg/pull/2515"
+      },
+      {
+        "name": "SMG Routing-key Issue",
+        "url": "https://github.com/smg-project/smg/issues/2480"
+      },
+      {
+        "name": "SMG Over-length Status Issue",
+        "url": "https://github.com/smg-project/smg/issues/2380"
+      },
+      {
+        "name": "SMG Releases",
+        "url": "https://github.com/smg-project/smg/releases"
+      }
+    ]
+  },
+  "backend": {
+    "content": "KServe 修复 InferenceService 覆盖 ServingRuntime 参数时的重复 Flag：过去 Runtime 与 ISVC 可同时产生两个 --http_port，Argparse 采用最后一个而 Readiness Probe 读取第一个，导致探针访问未监听端口；现在合并前先移除被覆盖项。SGLang HiCache 还把 LoRA extra_key 与 cache_salt 纳入 L3 Storage Hash，避免相同 Prompt 跨 Adapter 或 Salt 复用 KV，同时保持公开 KV Event Hash 的独立契约。最近 24–48 小时 Go、Rust 与 Kubernetes 官方发布列表无新稳定版本。",
+    "judgment": "配置 Merge 与缓存 Namespace 都是边界安全问题：同一字段只能有一个最终权威值，同一 KV 页面只能被语义兼容的请求复用。应把重复 Flag 和跨 Adapter Cache Hit 作为部署与多租户安全测试。",
+    "sources": [
+      {
+        "name": "KServe Runtime Arg Dedup",
+        "url": "https://github.com/kserve/kserve/pull/6178"
+      },
+      {
+        "name": "SGLang LoRA Cache Isolation",
+        "url": "https://github.com/sgl-project/sglang/pull/38577"
+      },
+      {
+        "name": "Go Release History",
+        "url": "https://go.dev/doc/devel/release"
+      },
+      {
+        "name": "Rust Releases",
+        "url": "https://github.com/rust-lang/rust/releases"
+      },
+      {
+        "name": "Kubernetes Releases",
+        "url": "https://github.com/kubernetes/kubernetes/releases"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "HiSparse 的三层 Residency 设计",
+      "summary": "GPU Resident Page、Pinned Host Pool 和 Per-request GPU Hot Buffer 由同一 Fused Resolver 选择，Host Hash 只在写入完整后发布给 Prefix Reuse。",
+      "judgment": "可作为稀疏 KV 分层设计参考；重点复用其 Durable-before-publish 与 Worker 全确认后再回收 GPU Block 的状态机。",
+      "sources": [
+        {
+          "name": "vLLM HiSparse",
+          "url": "https://github.com/vllm-project/vllm/pull/53781"
+        }
+      ]
+    },
+    {
+      "title": "Elastic EP 的停顿与总时长分离测量",
+      "summary": "vLLM 将 Existing Rank 停止进展的 Downtime 与后台 Prepare 加 Commit 的 Total Reconfiguration Time 分开报告。",
+      "judgment": "建议扩缩容 SLO 同时记录两项指标；用户体验首先受停顿窗口影响，运营效率则取决于总收敛时间。",
+      "sources": [
+        {
+          "name": "vLLM Elastic EP",
+          "url": "https://github.com/vllm-project/vllm/pull/54985"
+        }
+      ]
+    },
+    {
+      "title": "跨语言 TreeCore 的行为一致性测试",
+      "summary": "SGLang 用共享测试套件、Binding 字段穿透测试与真实 Branching Fingerprint 同时验证 Python/Rust 两套 Core。",
+      "judgment": "任何 Rust 重写或加速后端都应加入默认值检测：字段缺失必须失败，而不是悄悄退化为 None/False。",
+      "sources": [
+        {
+          "name": "SGLang Rust TreeCore",
+          "url": "https://github.com/sgl-project/sglang/pull/37584"
+        }
+      ]
+    },
+    {
+      "title": "SMG Cache-aware Router 观测草案",
+      "summary": "Open PR 提议按 Tree Match、Spill 与 Fallback 分支计数，并用 0.1 步长 Bucket 记录最佳 Prefix Match Ratio。",
+      "judgment": "即使尚未合并，这组指标定义也可直接用于 Router 仪表盘设计；需额外按模型或租户控制标签基数。",
+      "sources": [
+        {
+          "name": "SMG PR #2515",
+          "url": "https://github.com/smg-project/smg/pull/2515"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "最近 24–48 小时未核验到足够重大、且有公司一手公告支持的推理基础设施融资或并购。产业信号仍来自工程：Sparse KV 的容量层级开始从 GPU 延伸到共享 Host Memory；Elastic EP 与 CUDA Graph 则从静态峰值优化进入运行时生命周期管理。",
+    "judgment": "下一轮平台竞争会同时考验显存外容量、Host Bandwidth、Graph 可复用性和扩缩容停顿，而非只看单卡 Kernel 峰值。采购测试应增加长上下文 Host Miss、TP 共享池初始化、Elastic Scale Commit Window 与 Graph Pool 碎片四类压力场景。",
+    "sources": [
+      {
+        "name": "vLLM HiSparse Host Tier",
+        "url": "https://github.com/vllm-project/vllm/pull/53781"
+      },
+      {
+        "name": "vLLM Shared TP Cache",
+        "url": "https://github.com/vllm-project/vllm/pull/56629"
+      },
+      {
+        "name": "vLLM Elastic EP",
+        "url": "https://github.com/vllm-project/vllm/pull/54985"
+      },
+      {
+        "name": "SGLang Graph Pool",
+        "url": "https://github.com/sgl-project/sglang/pull/39177"
+      }
+    ]
+  },
+  "actions": [
+    "在目标 Sparse-MLA 模型上分别测 GPU Resident Hit、Hot-buffer Hit、Host Lookup、PCIe Bytes 与 P99 TPOT，确认 HiSparse 的 Host Tier 没有把容量收益转成尾延迟失控。",
+    "用生产规模 Host Pool 验证 vLLM TP 共享缓存的 mmap 创建、Pinned Registration、IPC Event、SIGKILL 清理和 NUMA 归属；不要以小 Pool Smoke Test 代替。",
+    "对 Elastic EP 扩容和缩容分别记录 Prepare、Commit Downtime、Total Time 与请求错误，并按 DeepGEMM、FlashInfer、Triton、CUTLASS Expert Backend 拆分吞吐。",
+    "构造不同 Grid Size 但可复用的 CUDA Graph，并在更新失败、Tensor 延迟释放和小段频繁借用下验证 Executable 保留与 Graph Pool 碎片上界。",
+    "持续跟踪 SMG PR #2516 与 #2515；合并后先做 Property Patch 下的 P/D KV 身份连续性和 Cache-aware Branch/Match Ratio 指标验收。",
+    "在 KServe 部署测试中重复覆盖 --http_port、模型参数与资源 Flag，确保最终容器参数、Readiness Probe 和实际监听配置只有一个权威值。"
+  ]
+}
