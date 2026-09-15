@@ -1,0 +1,206 @@
+{
+  "date": "2026-09-15",
+  "title": "状态不能随控制面操作丢失：SMG 修复 PD 更新，推测解码开始在线估计接受率",
+  "deck": "SMG 保住 Worker 属性更新后的 KV 身份与传输配置，并补齐 Cache-aware 可观测性和 DeepSeek-V4.1 原生契约；vLLM 用在线接受率估计器动态裁剪验证预算。",
+  "top_items": [
+    {
+      "title": "SMG 修复 Worker 属性更新丢失 P/D 传输状态",
+      "summary": "PATCH Worker 标签、优先级或健康超时会创建替代记录，旧实现从默认值重建，只复制部分字段，可能丢掉 KV Connector、Bootstrap Port、Pairing Protocol、DP Rank 以及健康检查刷新后的 KV Engine ID，使 vLLM Decode 回退为本地 Prefill。新实现从旧 Spec 派生替代记录，并让新旧记录共享实时 KV Engine ID 与确认标记。",
+      "judgment": "控制面 Patch 必须是对权威状态的局部变换，不能用默认对象覆盖数据面身份。该 PR 已覆盖 Mooncake、NIXL 与并发晚到探活结果，但明确尚未跑 GPU E2E，生产前仍需做真实 P/D 属性更新回归。",
+      "sources": [
+        {
+          "name": "SMG PR #2516",
+          "url": "https://github.com/smg-project/smg/pull/2516"
+        }
+      ]
+    },
+    {
+      "title": "SMG 合并 DeepSeek-V4.1 原生渲染、视觉预处理与解析器",
+      "summary": "三项 PR 分别实现无 Jinja 模板情况下的原生 Chat Renderer、与参考 Image Processor 对齐的 Patch/Token 布局，以及 Spaced-DSML Tool Call 与 Reasoning 状态机。Renderer 用 29 组 Fixture 做字节和 Token ID 对齐；视觉处理用 12 组图像 Fingerprint 固定 Patch Bytes；Parser 在多种 Chunk Size 下验证 One-shot 与 Streaming 一致。",
+      "judgment": "这是模型协议栈的关键底座，但 Gateway Wiring PR #2527 仍未合并，不能宣称 SMG 已完成端到端 DeepSeek-V4.1 支持。验收应覆盖 Renderer、Placeholder、Encoder Input Key、Parser Arming 与实际 Engine 输出的整链一致性。",
+      "sources": [
+        {
+          "name": "SMG V4.1 Renderer",
+          "url": "https://github.com/smg-project/smg/pull/2524"
+        },
+        {
+          "name": "SMG V4.1 Vision Processor",
+          "url": "https://github.com/smg-project/smg/pull/2526"
+        },
+        {
+          "name": "SMG V4.1 Parsers",
+          "url": "https://github.com/smg-project/smg/pull/2525"
+        }
+      ]
+    },
+    {
+      "title": "vLLM 用在线 Logistic Estimator 扩展自适应验证",
+      "summary": "Model Runner V2 现在可从 Draft Logits 的最大概率 Log-odds 在线拟合每个 Draft Position 的接受概率，让 MTP、EAGLE3、DFlash 与 DFlash2 在 Base Attention Backend 支持 Variable-length Verification 时动态裁剪全局验证预算。PR 的概率采样测试在四组模型/硬件上报告平均输出吞吐提升约 14.7%–44.5%；贪心场景与训练好的 Confidence Head 基本打平。",
+      "judgment": "自适应验证的收益来自少验证低生存概率的深层 Draft，不等同于提高原始接受率。上线应按数据集熵、Draft Depth 与 Sampling Mode 分桶，并确认 Attention Backend 的可变长契约。",
+      "sources": [
+        {
+          "name": "vLLM PR #52228",
+          "url": "https://github.com/vllm-project/vllm/pull/52228"
+        }
+      ]
+    },
+    {
+      "title": "SGLang 在 Rebootstrap 时保留原 Prefill Rank",
+      "summary": "P/D 请求 Retract 后恢复时，Replay 曾重新选择错误 Prefill Rank，Decode 仍等待原 Rank 的 KV 并最终超时。修复将 routed_dp_rank 从 disagg_prefill_dp_rank 恢复；H200、Mooncake、Prefill TP2/DP2 与 Decode TP1/DP1 的复现中，错误路径从 20 秒超时恢复为完整生成 128 Token，且 Token ID 与不中断对照一致。",
+      "judgment": "恢复路径必须重放原 Rendezvous 身份，而不只是请求内容。建议把 Prefill Rank、Room、KV Epoch 与 Decode Rank 作为一个不可分割的恢复上下文。",
+      "sources": [
+        {
+          "name": "SGLang PR #39357",
+          "url": "https://github.com/sgl-project/sglang/pull/39357"
+        }
+      ]
+    },
+    {
+      "title": "SGLang 合并 DCP 下相邻 KV Free Range，避免页内双重释放",
+      "summary": "Hybrid Mamba+MLA 在 DCP=8 时，Allocator Page 被扩成 512 Token，但 Mamba Cache Length Cap 仍落在 64 Token Grid；完成请求产生的两个相邻释放区间可能在同一大页内交界，触发 Shared-page 断言，若无断言则可能二次释放。新路径先合并真正相邻的 Range，再生成 Page-aligned Segment；有间隙但共享页面的异常仍被拒绝。",
+      "judgment": "并行维度放大 Page Geometry 后，上游所有 Length Cap 与 Free Boundary 都要重新审计。合并只能针对严格相邻区间，不能用 Coalesce 掩盖真实重叠。",
+      "sources": [
+        {
+          "name": "SGLang PR #38941",
+          "url": "https://github.com/sgl-project/sglang/pull/38941"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "SMG 的 Cache-aware Router 已新增按 tree_match、spill、expected_wait_fallback、first_healthy_fallback 分类的 Counter，以及最佳 Prefix Match Ratio 直方图，使亲和命中与负载回退可直接进入 Grafana。Responses API Regular Path 也修复 Custom Tool、Reasoning/Tool Streaming、Encrypted Reasoning Replay、Developer Tier 与 Incomplete Status，并在 GLM-5.3-Flash 上连续五轮取得 25 Pass、1 Skip。Spec Decode 的 Accepted/Rejected Prediction Token 已贯通 TokenSpeed、SGLang、vLLM Usage，TRT-LLM 仍需上游补接。Go Client 则修复 Error Channel 关闭时先返回 EOF、丢弃已缓冲 Completion 与最终 Usage 的竞态。SMG 最新 Release 仍为 v1.10.1。",
+    "judgment": "SMG 的进展从“能路由”转向“能解释且能保持状态”。下一步应把 Cache-aware 分支指标与 Engine 实际 Cache Hit 联合校验，并让 Spec Acceptance、Response Streaming 和 Go Client EOF 顺序共享端到端回归，而不只依赖组件单测。",
+    "sources": [
+      {
+        "name": "SMG Cache-aware Metrics",
+        "url": "https://github.com/smg-project/smg/pull/2515"
+      },
+      {
+        "name": "SMG Responses API Fixes",
+        "url": "https://github.com/smg-project/smg/pull/2502"
+      },
+      {
+        "name": "SMG Spec Acceptance Usage",
+        "url": "https://github.com/smg-project/smg/pull/2481"
+      },
+      {
+        "name": "SMG Go EOF Drain",
+        "url": "https://github.com/smg-project/smg/pull/2519"
+      },
+      {
+        "name": "SMG Releases",
+        "url": "https://github.com/smg-project/smg/releases"
+      }
+    ]
+  },
+  "backend": {
+    "content": "KServe 开始把 InferenceService Tracing 配置转换为 OTEL 环境变量并注入 vLLM Runtime；当前提交以 vLLM 为首个 Runtime，仍应验证 Collector 接收与 Context 传播。Kueue 在 Cohort Hierarchy 出现 Cycle 时会将受影响 ClusterQueue 标记为 Active=False、Reason=CohortCycleDetected，暂停 Admission 并在 Spec 修复后自动恢复，避免 Usage 递归无限循环拖挂 Controller。KServe 还统一了 HPA CPU/Memory Scale Target 的 1–100 校验与错误语义。最近 24–48 小时 Go、Rust 与 Kubernetes 官方发布列表无新稳定版本。",
+    "judgment": "可观测配置只有到 Collector 收到 Span 才算闭环；层级配额配置也必须 Fail Closed 并可自恢复。两类控制面都应把错误状态做成显式 Condition，而不是让请求或 Reconcile 静默卡住。",
+    "sources": [
+      {
+        "name": "KServe OTEL Injection",
+        "url": "https://github.com/kserve/kserve/pull/6172"
+      },
+      {
+        "name": "Kueue Cohort Cycle Guard",
+        "url": "https://github.com/kubernetes-sigs/kueue/pull/13774"
+      },
+      {
+        "name": "KServe HPA Validation",
+        "url": "https://github.com/kserve/kserve/pull/6140"
+      },
+      {
+        "name": "Go Release History",
+        "url": "https://go.dev/doc/devel/release"
+      },
+      {
+        "name": "Rust Releases",
+        "url": "https://github.com/rust-lang/rust/releases"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "DeepSeek-V4.1 协议对齐 Fixture 体系",
+      "summary": "SMG 同时固定 Chat Text、Token ID、Image Patch Byte、Grid、Token Count、Reasoning 与 Tool Stream Chunk 行为，并明确记录与 vLLM/SGLang 的差异。",
+      "judgment": "适合作为新模型接入模板：每一层都以参考实现生成 Golden Fixture，Gateway 只负责把这些已证明的契约连起来。",
+      "sources": [
+        {
+          "name": "Renderer Fixtures",
+          "url": "https://github.com/smg-project/smg/pull/2524"
+        },
+        {
+          "name": "Vision Fingerprints",
+          "url": "https://github.com/smg-project/smg/pull/2526"
+        },
+        {
+          "name": "Parser Streaming Tests",
+          "url": "https://github.com/smg-project/smg/pull/2525"
+        }
+      ]
+    },
+    {
+      "title": "在线接受率估计器的工程实现",
+      "summary": "vLLM 用共享斜率和每位置截距的 Logistic Regression 连续拟合 Draft 接受概率，再按生存概率为全 Batch 分配验证 Slot。",
+      "judgment": "值得复用其低维在线更新与全局 Top-k Budget 设计；监控必须包含 Calibration、AUC、接受长度、验证 Token 数和最终 TPOT。",
+      "sources": [
+        {
+          "name": "vLLM Adaptive Verification",
+          "url": "https://github.com/vllm-project/vllm/pull/52228"
+        }
+      ]
+    },
+    {
+      "title": "Responses API Conformance 回归集",
+      "summary": "SMG 用 26 个 Codex-oriented Case 检查 Custom Tool、Streaming Event Pair、Reasoning Replay、Developer Message、Image Input 与 Length Incomplete。",
+      "judgment": "适合作为 OpenAI-compatible Gateway 的协议发布门禁；Skipped Case 必须持续显式保留，不能被通过率平均掩盖。",
+      "sources": [
+        {
+          "name": "SMG Responses Conformance",
+          "url": "https://github.com/smg-project/smg/pull/2502"
+        }
+      ]
+    },
+    {
+      "title": "NIXL/UCX Fabric Device 固定方法",
+      "summary": "SMG E2E Harness 从 sysfs 解析 mlx5 绑定的 Fabric Netdev，设置 UCX_NET_DEVICES，避免 UCX 按 GPU 拓扑选到 VM NIC 后启动失败或首次传输挂死。",
+      "judgment": "这是测试基础设施修复，不是 SMG Runtime 自动选网能力；生产部署仍需由编排层显式提供可路由的 RDMA Device 列表。",
+      "sources": [
+        {
+          "name": "SMG UCX Device Pinning",
+          "url": "https://github.com/smg-project/smg/pull/2520"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "最近 24–48 小时未核验到足够重大、且有公司一手公告支持的推理基础设施融资或并购。工程信号显示，推理平台竞争正在从模型是否启动转向三类契约：控制面更新后的状态连续性、模型专属多模态/工具协议的字节级一致性，以及推测解码按在线流量动态调整计算预算。",
+    "judgment": "平台评估应加入“运行中修改 Worker 属性”“请求 Retract/Resume”“复杂 Tool+Reasoning Streaming”“高低熵流量切换”四类场景；稳态 Benchmark 无法暴露身份丢失、恢复错配和过度验证。",
+    "sources": [
+      {
+        "name": "SMG PD State Preservation",
+        "url": "https://github.com/smg-project/smg/pull/2516"
+      },
+      {
+        "name": "SMG DeepSeek-V4.1 Renderer",
+        "url": "https://github.com/smg-project/smg/pull/2524"
+      },
+      {
+        "name": "vLLM Online Acceptance Estimator",
+        "url": "https://github.com/vllm-project/vllm/pull/52228"
+      },
+      {
+        "name": "SGLang Rebootstrap Rank",
+        "url": "https://github.com/sgl-project/sglang/pull/39357"
+      }
+    ]
+  },
+  "actions": [
+    "在真实 SMG P/D 集群依次 Patch 标签、优先级与健康超时，确认 KV Connector、Bootstrap、Pairing Protocol、DP Rank 和刷新后的 KV Engine ID 全部保持。",
+    "为 Cache-aware Dashboard 接入分支 Counter 与 Match Ratio Histogram，并与 Engine 实际 Prefix Cache Hit 做相关性校验，识别高匹配却频繁回退的负载区间。",
+    "等待 SMG Gateway Wiring #2527 合并后，再做 DeepSeek-V4.1 Text、Image、Reasoning、并行 Tool Call 与 Continue-final-message 的端到端 Golden 回归。",
+    "在 vLLM 自适应验证上按 Draft Depth、Sampling Mode、输入熵和模型拆分 Acceptance Calibration、Draft Budget、TPOT 与吞吐，保留关闭功能的对照组。",
+    "对 SGLang Retract/Resume 注入 Prefill Rank 不同于 Room 映射 Rank 的场景，校验 Rendezvous 上下文恢复和最终 Token ID 一致。",
+    "在 DCP=1/2/4/8 下构造 Mamba Cache Cap 落在放大页内部的释放边界，确认仅相邻 Range 被合并、有间隙共享页仍触发保护。"
+  ]
+}
