@@ -1,0 +1,202 @@
+{
+  "date": "2026-09-16",
+  "title": "P/D 推测解码修复状态污染，分层 KV 路由开始端到端验真",
+  "deck": "vLLM 修复多层 MTP 在 Prefill/Decode 分离下残留未验证 Draft KV 的问题；SMG 打通 TokenSpeed ZMQ 多模态；SGLang 将分层 KV 路由补齐到真实 GPU、指标和 Grafana。",
+  "top_items": [
+    {
+      "title": "vLLM 修复 P/D 多层 MTP 的未验证 KV 污染",
+      "summary": "P/D 模式下，Prefill 实例最后一个 Chunk 会让多层 MTP 把未验证 Draft Token 写进后续 MTP Layer 的 KV Cache；Decode 实例又收不到拒绝数量，旧 Draft 因而长期残留并压低接受率。修复把最后若干 Prompt Token 留给 Decode 端重算。在 1P1D、TP2、4×GB200、8 个 Speculative Token 的提交者基准中，接受率由 1.11% 升至 31.51%，总 Token 吞吐由 3,520 升至 12,156 tok/s；两组均完成 512/512 请求。",
+      "judgment": "这是典型的跨阶段状态所有权错误，收益数字只适用于该模型、硬件和 2K/2K 负载，不能外推；但修复原则具有普适性：Prefill 不应把 Decode 无法校验或回滚的 Draft 状态交过去。生产验收应同时比较 Token 一致性、各层 KV 长度、接受率和 TPOT。",
+      "sources": [
+        {
+          "name": "vLLM PR #55055",
+          "url": "https://github.com/vllm-project/vllm/pull/55055"
+        }
+      ]
+    },
+    {
+      "title": "SMG 打通 TokenSpeed ZMQ 多模态发送链路",
+      "summary": "SMG 过去会在组装阶段拒绝经 TokenSpeed Direct ZMQ 的多模态请求，因为 Rust Wire Struct 只建模了文本前缀。新实现补齐 Wire Index 22 的 Multimodal Inputs、Tensor 编码、Pad Value、Placeholder 替换与 Proto/Engine 模态枚举映射，并以 TokenSpeed 自身 Msgpack Decoder 做跨语言字段级 Round-trip。文本请求仍保留原 11 元素前缀。",
+      "judgment": "这让 Direct ZMQ 不再是多模态功能缺口，但不是全模型就绪：MRoPE Position Tensor 尚不能由 Gateway 推导，相关模型会退化为一维位置。上线前应按模型族分别验证 Image/Audio/Video、Placeholder、Dtype、Shape 与 Position Encoding，不能只看请求是否被接受。",
+      "sources": [
+        {
+          "name": "SMG PR #2539",
+          "url": "https://github.com/smg-project/smg/pull/2539"
+        }
+      ]
+    },
+    {
+      "title": "vLLM 修复 HiSparse 多层共享 Allocation 的跨层覆盖",
+      "summary": "HiSparse 将多层 KV 打包到同一 Allocation 时，Resident 与 Hot Binding 都曾对每层复用 Tensor Base Offset，后层会覆盖前层缓存行。修复为每层使用 base offset + layer index × layer stride，并新增真实 GLM-5.2 权重的 Nightly GSM8K 门禁。提交者在 4×B300 的本地验证中得到 94.39%（1,245/1,319），负面对照前 64 题为 0/64；同时明确说明完整 Pytest 因既有 NVML Teardown 问题未报告为通过。",
+      "judgment": "这是会产生静默错误答案的布局 Bug，比性能回退更危险。任何把多层张量压入统一 Arena 的实现，都应把 Offset/Stride/Layer Count 做成可检查的 Binding Contract，并保留能让错误实现显著失败的负面对照。",
+      "sources": [
+        {
+          "name": "vLLM PR #57027",
+          "url": "https://github.com/vllm-project/vllm/pull/57027"
+        }
+      ]
+    },
+    {
+      "title": "SGLang 分层 KV 路由补齐真实 GPU 证明与可观测闭环",
+      "summary": "默认 Radix Tree 过去丢弃 KV Event 的 Storage Medium，GPU 层移除会把 Worker 整体从 Prefix Owner 中删除，即使 Host 仍保留副本。四段改动让 Tree 按 Device/Host/Disk/External 持有 Tier Bit，增加 Event、Lost Batch、Tree Occupancy 与 Accounting Error 指标，用两台真实 GPU Worker 覆盖 Write-through/Write-back 两种相反事件顺序，并新增 Grafana 的 Tree/Engine Host Tier Coverage。GPU E2E 报告两个模式的重复请求均从 Host 命中 1,088 Token、Device 命中为 0。",
+      "judgment": "价值不只是修复 Tier Bit，而是把‘路由器认为谁有缓存’与‘引擎实际从哪层服务’连成可验证闭环。Coverage 约 1 才表示视图一致；接近 0 是路由盲区，高于 1 则应结合 Lost Batch 排查陈旧所有权。",
+      "sources": [
+        {
+          "name": "SGLang Tier-aware Tree",
+          "url": "https://github.com/sgl-project/sglang/pull/39108"
+        },
+        {
+          "name": "SGLang Tier Metrics",
+          "url": "https://github.com/sgl-project/sglang/pull/39109"
+        },
+        {
+          "name": "SGLang GPU E2E",
+          "url": "https://github.com/sgl-project/sglang/pull/39110"
+        },
+        {
+          "name": "SGLang Grafana Coverage",
+          "url": "https://github.com/sgl-project/sglang/pull/39111"
+        }
+      ]
+    },
+    {
+      "title": "Kueue 修复 TAS 只看 Worker、不看 Leader 的错误准入",
+      "summary": "Topology Aware Scheduling 为 PodSet Group 选 Domain 时，过去只检查 Worker 的 Node Filter；若 Leader 使用不同 Template，Workload 可能被准入到 Leader 无法运行的 Domain，随后长期 Pending 却占着配额。修复在选域时加入 Leader 的 Node Selector、Toleration、Node Affinity 与 DRA Feasibility，行为由 TASLeaderPodSetFeasibility Gate 控制。",
+      "judgment": "Gang/Leader-Worker 工作负载的可行性必须取所有角色约束的交集。升级后应构造 Leader/Worker 异构亲和性与设备请求，验证不可运行的组不会先拿到配额再卡住。",
+      "sources": [
+        {
+          "name": "Kueue PR #15447",
+          "url": "https://github.com/kubernetes-sigs/kueue/pull/15447"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "SMG 的 DeepSeek-V4.1 Gateway Wiring 已合并，把 Encoder Tensor Key、Renderer Capabilities、enable_thinking、Native Continuation 与 Raw Tool Arguments 串进 gRPC/ZMQ 链路，兑现昨日仍待合并的端到端接线；但 Anthropic Assistant Prefill 与 smg-grpc-proto 版本下限仍列为后续工作。另一个当天修复阻止无 Tools 的 GLM-4.7/GLM-5 Chat 请求携带无意义 EBNF Grammar，避免 TokenSpeed 以 grammar-backend none 启动时返回 500；Tool-bearing 请求仍会发送 Grammar。Plain HTTP Listener 也启用 TCP_NODELAY，减少小 SSE Chunk 被 Nagle 延迟的风险。SMG 最新 Release 仍为 v1.10.1。与此同时，Discovery 拆分 PR #2532 正在审查中：它把 Kubernetes Watch、Provider-neutral Reconcile 与 Mesh Router Discovery 解耦，为 File/Slurm/Consul Provider 铺路，但尚未合并，且会造成 Rust API Source Break。",
+    "judgment": "SMG 当前最值得做的是把模型协议、Transport 与 Worker Capability 纳入同一个兼容矩阵。Grammar Backend、MRoPE、Encoder Key 和 Wire Version 都不该由请求失败后才暴露；应在 Worker 注册阶段声明能力并由 Gateway 做准入。Discovery 重构方向合理，但在合并前要重点审查 Rust API 迁移、任务生命周期与 IPv6 Endpoint。",
+    "sources": [
+      {
+        "name": "SMG DeepSeek-V4.1 Gateway Wiring",
+        "url": "https://github.com/smg-project/smg/pull/2527"
+      },
+      {
+        "name": "SMG GLM Grammar Fix",
+        "url": "https://github.com/smg-project/smg/pull/2549"
+      },
+      {
+        "name": "SMG TCP_NODELAY",
+        "url": "https://github.com/smg-project/smg/pull/2534"
+      },
+      {
+        "name": "SMG Discovery Split",
+        "url": "https://github.com/smg-project/smg/pull/2532"
+      },
+      {
+        "name": "SMG Releases",
+        "url": "https://github.com/smg-project/smg/releases"
+      }
+    ]
+  },
+  "backend": {
+    "content": "SGLang 将 Unified Full-attention 与 Sliding-window Pool 的静态分池上限改为共享 Byte Budget，让一侧可借用另一侧未使用的容量，并让容量指标跟随真实动态分配状态；提交通过 331 个聚焦测试和 722 个子测试，但未运行完整模型、Multi-node P/D 或性能评测。Router 还开始为每个 Worker 在注册时解析 HTTP/1.1 或 H2C Wire Protocol，不过当前 PR 只记录决策，尚未改变线上字节。Kueue 同时修复 TAS Preemption Feasibility：模拟器现在针对‘移除候选 Workload 后的集群’判断，避免候选自身占用的 Host Port 或 DRA Device 让系统错误认为抢占无效。最近 24–48 小时 Go、Rust、Kubernetes、vLLM、SGLang 与 SMG 均无新的稳定 Release。",
+    "judgment": "共享容量能减少人为碎片，但调度 Admission、Decode Preallocation 与 Capacity Metrics 必须使用同一套 Byte Accounting；H2C 则要等实际 Client Wiring 合并后才能评价收益。TAS 的两项修复共同说明：Quota Admission 前必须模拟完整角色与抢占后的真实资源世界，而不是当前快照的局部近似。",
+    "sources": [
+      {
+        "name": "SGLang Shared Hybrid-SWA Budget",
+        "url": "https://github.com/sgl-project/sglang/pull/36729"
+      },
+      {
+        "name": "SGLang Per-worker Wire Protocol",
+        "url": "https://github.com/sgl-project/sglang/pull/39004"
+      },
+      {
+        "name": "Kueue TAS Post-preemption Feasibility",
+        "url": "https://github.com/kubernetes-sigs/kueue/pull/15436"
+      },
+      {
+        "name": "Go Release History",
+        "url": "https://go.dev/doc/devel/release"
+      },
+      {
+        "name": "Rust Releases",
+        "url": "https://github.com/rust-lang/rust/releases"
+      },
+      {
+        "name": "Kubernetes Releases",
+        "url": "https://github.com/kubernetes/kubernetes/releases"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "P/D 多层 MTP KV 生命周期回归",
+      "summary": "vLLM PR 给出未验证 Draft KV 如何跨 Prefill/Decode 边界残留的可视化、重算策略和接受率/吞吐对照。",
+      "judgment": "可直接转化为自家 Spec Decode 门禁：逐层检查 Cache Length 与 Token Provenance，并在阶段交接处验证所有未确认状态都可被 Decode 重建。",
+      "sources": [
+        {
+          "name": "vLLM MTP P/D Fix",
+          "url": "https://github.com/vllm-project/vllm/pull/55055"
+        }
+      ]
+    },
+    {
+      "title": "分层 KV 路由一致性仪表盘",
+      "summary": "SGLang 将 Event Medium、Tree Occupancy、Engine Host Usage、Sequence Gap 与 Accounting Error 组合成 Storage-tier Coverage。",
+      "judgment": "适合作为 Cache-aware Router 的标准 SLO 面板；分子分母必须按同一 Namespace/Deployment 聚合，否则不同 Block Size 和 Fleet Membership 会制造看似合理的错误比率。",
+      "sources": [
+        {
+          "name": "SGLang KV Tier Dashboard",
+          "url": "https://github.com/sgl-project/sglang/pull/39111"
+        }
+      ]
+    },
+    {
+      "title": "SMG TokenSpeed 多模态 Wire Contract",
+      "summary": "实现包含位置型 Msgpack Arity、Tensor Extension、Pad Hash、Inclusive Offset 与不同枚举值之间的显式映射。",
+      "judgment": "适合复用为跨语言二进制协议测试模板：必须由接收端官方 Decoder 反解 Golden Vector，而不只在发送端做 Self Round-trip。",
+      "sources": [
+        {
+          "name": "SMG TokenSpeed Multimodal",
+          "url": "https://github.com/smg-project/smg/pull/2539"
+        }
+      ]
+    },
+    {
+      "title": "MultiKueue 弹性 Ray Autoscaling KEP",
+      "summary": "Kueue 合入 KEP 草案，设计 Worker-to-manager 同步，使 Worker 集群中的 Ray Replica 与 Revision 变化可回传并更新配额，而不修改 Manager 侧工作负载配置。",
+      "judgment": "目前是 KEP 而非正式功能；值得关注其状态同步、失败恢复和配额重新计算语义，不应按已可用能力规划生产依赖。",
+      "sources": [
+        {
+          "name": "Kueue KEP-13243",
+          "url": "https://github.com/kubernetes-sigs/kueue/pull/13494"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "最近 24–48 小时未核验到足够重大、且有公司一手公告支持的推理基础设施融资或并购。工程侧更明确的信号是：性能优化正在从单 Kernel 转向跨阶段状态、分层内存和路由视图的一致性；同时，多模态与工具调用把 Gateway/Engine Wire Contract 变成生产正确性的核心边界。",
+    "judgment": "采购或自研平台时，单次吞吐榜单的权重应下降；更应要求提供 P/D 状态交接、分层 KV 命中归因、跨语言 Wire Golden Test、能力协商和负面对照。无法证明这些边界的系统，很可能在复杂流量下用错误答案或随机冷 Prefill 换取表面可用。",
+    "sources": [
+      {
+        "name": "vLLM P/D MTP State Fix",
+        "url": "https://github.com/vllm-project/vllm/pull/55055"
+      },
+      {
+        "name": "SGLang Tier-aware KV Routing",
+        "url": "https://github.com/sgl-project/sglang/pull/39108"
+      },
+      {
+        "name": "SMG Multimodal Wire",
+        "url": "https://github.com/smg-project/smg/pull/2539"
+      }
+    ]
+  },
+  "actions": [
+    "在现有 P/D 环境构造多层 MTP 最后一个 Prefill Chunk，逐层记录交接前后的 KV 长度、Draft Token Provenance、接受率与最终 Token，确认 Decode 重算覆盖所有未验证状态。",
+    "为 SMG TokenSpeed ZMQ 建立 Text、Image、Audio、Video 的跨语言 Golden Vector；把 MRoPE 模型列为暂不准入，直到 Position Tensor 路径补齐。",
+    "在 SMG Worker 注册信息中评估加入 Grammar Backend、Multimodal/MRoPE、Wire Version 和 Renderer Capability，避免请求到达引擎后才发现能力不兼容。",
+    "部署 SGLang KV Tier 指标与 Grafana 行，按 Namespace 计算 Tree/Engine Coverage，并对 Coverage 接近 0、超过 1、Lost Batch 增长分别设置告警。",
+    "对 HiSparse 或自研统一 KV Arena 增加 Layer Offset/Stride 不重叠断言，并保留会让旧实现显著掉准的真实权重负面对照。",
+    "在 Kueue 测试环境组合 Leader/Worker 不同 Affinity、Toleration、Host Port 与 DRA Device，确认不可行组不占配额，抢占模拟会移除候选自身占用。"
+  ]
+}
