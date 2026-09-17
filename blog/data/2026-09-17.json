@@ -1,0 +1,198 @@
+{
+  "date": "2026-09-17",
+  "title": "KV 传输开始校验，推测解码在内存压力下堵死调度器",
+  "deck": "vLLM 连续修复 KV Connector 与 MTP 的死锁、异构页几何错传；SGLang 为 P/D KV 增加可选完整性校验；SMG 补齐 vLLM gRPC Cache Flush。",
+  "top_items": [
+    {
+      "title": "vLLM 修复 KV Connector + MTP 在内存压力下的调度死锁",
+      "summary": "异步 KV Load Admission 过去不为 MTP Lookahead 预留 Block；Remote KV 到达后，请求才追加申请 Lookahead，但缓存已经被其他等待请求占满。队首请求于是从 WAITING_FOR_REMOTE_KV 变为 WAITING，却反复因无法分配一个 MTP Block 而 Break；若没有 Running Request 释放 Block，Scheduler 会永久循环。该问题来自 GLM-5.2 生产部署，PR 已加入单测和复现。",
+      "judgment": "这是 Reservation 与真正启动成本不一致导致的资源死锁。任何异步载入或两阶段 Admission 都必须一次性预留‘载入完成后才能知道的附加状态’，并为零 Running Request、零空闲 Block 的场景建立 Progress Invariant。",
+      "sources": [
+        {
+          "name": "vLLM PR #57104",
+          "url": "https://github.com/vllm-project/vllm/pull/57104"
+        }
+      ]
+    },
+    {
+      "title": "vLLM 修复 NIXL 在异构逻辑 Block 几何下加载错误 Prompt Page",
+      "summary": "Prefill 端 Plain NIXL 与 Decode 端 NIXL+HiSparse 即使都配置 block-size=128，Scheduler Logical Block 仍可能分别是 128 与 64，而 Physical Page 同为 64。旧的 Region Suffix Matcher 把 Prefill 端尾部多出的未使用容量误当成 Decode 已缓存前缀，导致 160 Token Prompt 选到 B/C/unused 而不是 A/B/C。修复改为按 Token Position 选择 Producer Page，并按 Region Read Plan 清理接收端未写入的整页。",
+      "judgment": "命令行 Block Size 相等不代表物理传输几何相等。P/D 传输协议必须携带 Logical Capacity、Physical Page、有效 Token 数与 Cache Group/Region 映射；否则成功完成 DMA 也可能得到静默错误的 KV。",
+      "sources": [
+        {
+          "name": "vLLM PR #57077",
+          "url": "https://github.com/vllm-project/vllm/pull/57077"
+        }
+      ]
+    },
+    {
+      "title": "SGLang 为 P/D KV Transfer 加入可选 Adler-32 校验",
+      "summary": "新开关 --disaggregation-enable-kv-checksum 在 Prefill 端以 GPU Kernel 对连续区间或索引页计算 Adler-32，并随最后一个 Chunk 发送；Decode 在进入 Batch 前验证，Retract 后仍保留校验元数据。Mismatch 会终止该请求并增加 Transfer Failure Counter。功能默认关闭，要求两端 KV Layout 一致；聚焦验证包含 23 个 CUDA 测试与 58 个 CPU 测试，但未做完整模型精度或性能基准。",
+      "judgment": "校验把‘传输完成’升级为‘内容一致’，适合疑难故障和高价值流量；但会增加 GPU 读与同步，不应在没有分桶基准时全量开启。建议先按模型、链路、错误率采样启用，并把校验失败与 Transport Retry、Worker 隔离联动。",
+      "sources": [
+        {
+          "name": "SGLang PR #39500",
+          "url": "https://github.com/sgl-project/sglang/pull/39500"
+        }
+      ]
+    },
+    {
+      "title": "SMG 补齐 vLLM gRPC Prefix Cache Flush",
+      "summary": "SMG 的 POST /flush_cache 过去对 vLLM gRPC Worker 返回 UNIMPLEMENTED；新路径贯通 Proto、Rust Client、Gateway 与 Python Servicer，把 FlushCache 转发到 vLLM Prefix Cache Reset。内部 DP 只有所有受管 Rank 在同一次尝试中成功才算成功；正超时会在 Deadline 内重试，零超时只尝试一次。操作不抢占请求、不清 Connector/Encoder Cache，也不保证跨 Rank 或 Worker 原子性，超时后仍可能完成。",
+      "judgment": "统一管理面能力是好进展，但非原子 Flush 必须当作最终一致操作。调用方应记录 Operation ID、每 Rank 结果与完成时间，避免超时后盲目重试造成不可解释的 Cache 状态；该 PR 本地 GPU E2E 未验证，生产前应补真实 vLLM 回归。",
+      "sources": [
+        {
+          "name": "SMG PR #2554",
+          "url": "https://github.com/smg-project/smg/pull/2554"
+        }
+      ]
+    },
+    {
+      "title": "KServe 用 Regex Strategy 把 LoRA HTTPRoute 从线性增长变为常量规模",
+      "summary": "Exact Routing 会为每个 Adapter 复制 Match，默认模板超过约七个 Adapter 后可能撞上 Gateway API 单 Rule Match Budget。KServe 新增可选 loraModelRoutingStrategy=regex，把 Base Model 与全部 Adapter 折叠为一个 Anchor 且 Literal-escaped 的 Pattern；Exact 仍是默认。Kind + Envoy Gateway + vLLM E2E 已验证 100 个 Adapter，3 项测试通过。",
+      "judgment": "这解决控制面对象规模而不是推理性能。Regex 上限仍由具体 Gateway 的 Program-size Budget 决定；切回 Exact 时若 Adapter 过多会保留旧 Regex Route。上线前必须在所用 Envoy/Istio 版本上验证 Pattern Size、NACK 可观测性与 Near-miss Identity。",
+      "sources": [
+        {
+          "name": "KServe PR #6174",
+          "url": "https://github.com/kserve/kserve/pull/6174"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "SMG 还修复了 GLM-4.7/GLM-5 工具调用约束：Auto 与 None 恢复为不发送 Grammar，只有 Required 或 Named Choice 才使用与 vLLM/SGLang 语义一致的 Structural Tag，并为 Thinking Prompt 显式加入 Reasoning Prefix，避免 Tool Call 被吞进 reasoning_content。DeepSeek-V4.1 的 BFCL/Tau2 CI 已切到 V4.1-Flash 与 Per-commit vLLM Wheel。另一组更大的多模态 Media Reference Stack 仍在审查中，计划把 Fetch/Preprocess 从 Router 下沉到 vLLM Worker 或 Redis Sidecar；当前 Proto/Servicer、Router Forwarding、Sidecar 与 E2E PR 尚未合并，不应视为可用能力。SMG 最新 Release 仍为 v1.10.1。",
+    "judgment": "SMG 的短期重点应从‘新增协议字段’转向 Capability Negotiation 与管理操作语义：Grammar Backend、Media Ref Scheme、Multimodal Processor、Flush 原子性和 DP Rank Result 都需要在 Worker 注册时显式声明。开放中的 Worker-side Multimodal Stack 必须在合并前验证 URL Allowlist、Fetch Timeout、Sidecar Failure Isolation 和 P/D 两端 Cache Contract。",
+    "sources": [
+      {
+        "name": "SMG GLM Structural Tag",
+        "url": "https://github.com/smg-project/smg/pull/2550"
+      },
+      {
+        "name": "SMG DeepSeek-V4.1 CI",
+        "url": "https://github.com/smg-project/smg/pull/2551"
+      },
+      {
+        "name": "SMG Media Ref Proto/Servicer",
+        "url": "https://github.com/smg-project/smg/pull/2399"
+      },
+      {
+        "name": "SMG Media Ref Forwarding",
+        "url": "https://github.com/smg-project/smg/pull/2400"
+      },
+      {
+        "name": "SMG Redis Media Sidecar",
+        "url": "https://github.com/smg-project/smg/pull/2401"
+      },
+      {
+        "name": "SMG Releases",
+        "url": "https://github.com/smg-project/smg/releases"
+      }
+    ]
+  },
+  "backend": {
+    "content": "SGLang Router 在 SIGTERM 时先把 /readyz 置为 503，继续服务 shutdown-drain-secs，再停止 Accept；SIGINT 跳过等待，Axum 随后无界等待 In-flight Stream，由 Kubernetes terminationGracePeriodSeconds 最终兜底。Cache-aware Router 还新增 saturation-queue-floor：当整个可路由 Prefill Fleet 没有可证明低于 Floor 的 Worker 时，取消无收益的 Off-owner Diversion，把请求留给压力最低的 Prefix Owner。Kueue 修复 Elastic Job 在 Pending Scale-up Slice 被抢占时过早释放 Quota，改为等 Active Pod 停止；Leader Election Lease Client 也获得独立 Rate Limiter，避免 Controller Burst 饿死 Lease Renewal。最近 24–48 小时 Go、Rust、Kubernetes、vLLM、SGLang 与 SMG 均无新的稳定 Release。",
+    "judgment": "优雅下线必须把 Readiness Propagation Window、In-flight Stream 和 Pod Grace Period 当作三段预算；Cache-aware Saturation 则应以 Fresh Queue Coverage 为前提。Kueue 的两项修复再次说明：控制器的配额账本和 Leader Lease 都不能与业务 Reconcile 共享不受隔离的资源生命周期。",
+    "sources": [
+      {
+        "name": "SGLang Shutdown Drain",
+        "url": "https://github.com/sgl-project/sglang/pull/39016"
+      },
+      {
+        "name": "SGLang Saturation Pin",
+        "url": "https://github.com/sgl-project/sglang/pull/39169"
+      },
+      {
+        "name": "Kueue Elastic Slice Drain",
+        "url": "https://github.com/kubernetes-sigs/kueue/pull/15661"
+      },
+      {
+        "name": "Kueue Leader Election Isolation",
+        "url": "https://github.com/kubernetes-sigs/kueue/pull/15538"
+      },
+      {
+        "name": "Go Release History",
+        "url": "https://go.dev/doc/devel/release"
+      },
+      {
+        "name": "Rust Releases",
+        "url": "https://github.com/rust-lang/rust/releases"
+      },
+      {
+        "name": "Kubernetes Releases",
+        "url": "https://github.com/kubernetes/kubernetes/releases"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "异构 Block Geometry 的 Token-position Transfer Plan",
+      "summary": "vLLM PR #57077 用 160 Token Prompt 解释 Logical Block、Physical Page、有效 Token 与尾部未使用容量如何错位，并给出 Region-local Zero Plan。",
+      "judgment": "适合作为 KV Transfer 设计评审模板：用具体 Token 布局画出 Producer/Consumer Geometry，再证明选页、Prefix Offset、Partial Tail 和 Completion Cleanup。",
+      "sources": [
+        {
+          "name": "vLLM Region-mapped Pull Fix",
+          "url": "https://github.com/vllm-project/vllm/pull/57077"
+        }
+      ]
+    },
+    {
+      "title": "P/D KV 完整性校验实现",
+      "summary": "SGLang 给出 Contiguous/Indexed Page 的 GPU Adler-32 Kernel、Wire Metadata、Retract 保留与 Failure Counter 集成。",
+      "judgment": "可借鉴其 Opt-in 设计和故障归因，但正式启用前必须测量不同 Context Length、Page Layout 与 Batch Size 下的额外 GPU Read、同步和 TTFT。",
+      "sources": [
+        {
+          "name": "SGLang KV Checksum",
+          "url": "https://github.com/sgl-project/sglang/pull/39500"
+        }
+      ]
+    },
+    {
+      "title": "Fleet-wide Sampling Contract 的零拷贝注入",
+      "summary": "SGLang Router 将平台强制 Sampling Override 直接 Splice 到 JSON Closing Brace 前，避免对最大 32 MiB Body 做 Parse+Reserialize；16 MiB Body 的提交者微基准约为 0.24 ms 对 5.7 ms。",
+      "judgment": "适合需要平台级 Temperature/Top-p Policy 的 Gateway；必须保留 JSON 语义等价测试、显式 Null 覆盖规则和无法定位 Brace 时的安全回退。",
+      "sources": [
+        {
+          "name": "SGLang Sampling Contract",
+          "url": "https://github.com/sgl-project/sglang/pull/39002"
+        }
+      ]
+    },
+    {
+      "title": "KServe Shared-PVC Model Cache",
+      "summary": "LocalModelNamespaceCache 新增 pvcRef 模式，把模型一次导入用户提供的 RWX PVC，再由跨节点 Serving Replica 只读共享，避免每节点复制。",
+      "judgment": "适合 NFS、CephFS、Filestore 或 Azure Files，但 Ready 转换不会主动 Requeue 既有 Workload，私有 OCI 认证也尚未支持；应把存储吞吐和首次加载风暴纳入容量评估。",
+      "sources": [
+        {
+          "name": "KServe PR #6107",
+          "url": "https://github.com/kserve/kserve/pull/6107"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "最近 24–48 小时未核验到足够重大、且有公司一手公告支持的推理基础设施融资或并购。更强的产业信号来自生产修复：推理平台的差异化正从 Kernel 峰值转向分布式状态是否可证明——调度是否前进、KV 是否传对、管理操作是否可观测、Cache-aware 路由是否在饱和时仍保留局部性。",
+    "judgment": "平台评估应把 Deadlock Reproducer、KV Content Checksum、异构 Block Geometry、Non-atomic Admin Operation 和 Graceful Shutdown 纳入采购门槛。只有吞吐数字、没有失败时状态证据的 Serving Stack，不足以支撑高利用率生产集群。",
+    "sources": [
+      {
+        "name": "vLLM KV/MTP Deadlock",
+        "url": "https://github.com/vllm-project/vllm/pull/57104"
+      },
+      {
+        "name": "SGLang KV Checksum",
+        "url": "https://github.com/sgl-project/sglang/pull/39500"
+      },
+      {
+        "name": "SMG gRPC Cache Flush",
+        "url": "https://github.com/smg-project/smg/pull/2554"
+      }
+    ]
+  },
+  "actions": [
+    "在 KV Connector + MTP 环境复现零空闲 Block、零 Running Request、两个 Remote-KV Waiting Request 的最小死锁，增加 Scheduler Progress 指标和 Watchdog。",
+    "为 P/D KV 协议记录每个 Cache Group 的 Logical Block、Physical Page、有效 Token 数、Region Owner 与 Prefix Offset，并用异构几何做 Golden Transfer Test。",
+    "在 SGLang 预发按 1% 流量开启 KV Checksum，分桶记录 Context Length、额外 TTFT、GPU 利用率、Mismatch 与 Transfer Retry，再决定是否扩大。",
+    "为 SMG Flush Cache 封装 Operation ID、每 Worker/DP Rank 结果和最终完成状态；真实 vLLM GPU E2E 通过前不要把超时解释成失败并立即重试。",
+    "审查 SMG Worker-side Multimodal Stack 的 URL Allowlist、Fetch Timeout、Inline Byte Cap、Redis Sidecar 故障与 P/D Processor Cache 一致性，等 E2E 合并后再开放。",
+    "在 Kubernetes Rollout 中把 SGLang shutdown-drain-secs、Endpoint Propagation 与 terminationGracePeriodSeconds 做成同一预算测试，并用长 Streaming Request 验证不截断。"
+  ]
+}
