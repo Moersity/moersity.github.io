@@ -1,0 +1,198 @@
+{
+  "date": "2026-09-18",
+  "title": "角色可以热切换，KV 可以单独释放：推理集群开始治理弹性",
+  "deck": "SGLang 让 Prefill/Decode 角色运行时切换，vLLM 支持只释放 KV 而保留权重；SMG 则集中修复 Kimi 协议与错误隔离。",
+  "top_items": [
+    {
+      "title": "SGLang 首次打通运行时 Prefill / Decode 角色切换",
+      "summary": "SGLang 新增默认关闭的运行时角色切换：节点先排空到 Idle，再拆除并重建角色相关的 KV Transfer 结构；从 Prefill 切到 Decode 时还会捕获 Decode CUDA Graph，但无需重新加载模型权重或 KV Pool。首个 PoC 只支持 Mori Backend 与纯 TP，尚无自动扩缩策略；提交者报告 17 项单测、GSM8K/性能验证及连续 100 次切换未见内存泄漏。",
+      "judgment": "这是把 P/D 比例从部署时常量变成运行时控制量的关键一步，但当前更像安全的手动执行器。生产价值取决于 Drain 时延、切换失败回滚和基于 Queue/KV 压力的闭环策略，不能把‘可切换’直接等同于‘可自动弹性’。",
+      "sources": [
+        {
+          "name": "SGLang PR #28403",
+          "url": "https://github.com/sgl-project/sglang/pull/28403"
+        }
+      ]
+    },
+    {
+      "title": "vLLM 支持只释放 KV Cache、保留模型权重",
+      "summary": "新 API release_kv_cache_memory() 丢弃 KV Cache Block，同时让 Scheduler 保持 Pause，直到显式 wake_up；模型权重仍驻留 GPU。实现采用 Fail-closed：只要 Worker 释放失败，Engine 不会宣称成功。能力同时暴露给 REST 与 Offline Engine，提交验证包括 5 项 Engine Core 测试和 2 项真实 Qwen3 生成测试。",
+      "judgment": "这比休眠整个 Engine 更适合节点缩容、显存临时借用与维护窗口，也为 P/D 角色切换提供更细的资源原语。调用方必须把 Release 与 Wake-up 当作有状态事务，并在流量恢复前确认 Scheduler 和 KV Epoch 一致。",
+      "sources": [
+        {
+          "name": "vLLM PR #44890",
+          "url": "https://github.com/vllm-project/vllm/pull/44890"
+        }
+      ]
+    },
+    {
+      "title": "vLLM 修复 max_num_seqs 非 8 倍数时的满载吞吐断崖",
+      "summary": "默认 CUDA Graph Shape 多为 8 的倍数，max_num_seqs=100 时，Batch 97–100 会落入 PIECEWISE Capture。修复在上限不超过 Capture Ceiling 时为 max_num_seqs 额外捕获 FULL Graph。提交者在 TP4/B200、Batch 97 的特定基准中报告吞吐从 1523 提升到 3876.85 tok/s、时延从 129.72 秒降到 52.41 秒；11 项配置测试与 6 项 Canonical Shape 测试通过。",
+      "judgment": "这暴露了容量参数与图形状集合之间的隐藏耦合，修复的是满载 Shape 缺口而非 PIECEWISE Rank Drift 本身。所有自定义并发上限都应在边界 Batch 做吞吐扫描，不能只测 8 的倍数。",
+      "sources": [
+        {
+          "name": "vLLM PR #57355",
+          "url": "https://github.com/vllm-project/vllm/pull/57355"
+        }
+      ]
+    },
+    {
+      "title": "SMG 集中补齐 Kimi K3 的 Prompt、Streaming 与错误隔离契约",
+      "summary": "SMG 用真实 vLLM/B200 的 55 个 Prompt-token Oracle 定位三类差异：Response Stub 多计 3 Token、Raw Tool Arguments 被误判 400、图像顺序每张偏移 1 Token；修复新增未计费 Prompt Token、Raw Args 能力和媒体顺序控制。配套 PR 让 Kimi Streaming 在未配置时默认 include_usage=true，并把 vLLM Validation Error 映射为 4xx，避免无效请求重试后污染 Circuit Breaker。提交者报告 43 个文本与 11 个视觉 Oracle 精确对齐、326 项协议测试及 599 项 Rust 测试。",
+      "judgment": "这批修复的价值不只是兼容一个模型，而是把 Billing、Tool Payload、Multimodal Ordering 与 Retry Classification 变成可验证契约。特别是 4xx/5xx 分类会直接影响熔断半径，应持续用真实后端 Golden Oracle 而不是只靠 Mock。",
+      "sources": [
+        {
+          "name": "SMG Kimi Prompt Parity #2564",
+          "url": "https://github.com/smg-project/smg/pull/2564"
+        },
+        {
+          "name": "SMG Kimi Streaming #2561",
+          "url": "https://github.com/smg-project/smg/pull/2561"
+        },
+        {
+          "name": "SMG Validation Isolation #2565",
+          "url": "https://github.com/smg-project/smg/pull/2565"
+        }
+      ]
+    },
+    {
+      "title": "SGLang 用 Tail-aware LRU 缓解 Agentic 会话尾延迟",
+      "summary": "可选的 T-LRU 在正常 LRU 前，先识别可在 TTFT Budget 内重算的会话尾部并安全驱逐，面向多轮 Agentic Workload。提交者在 DeepSeek-V4-Pro FP4、4×B300 的 SemiAnalysis Trace 上报告：并发 32 时 P99 ITL 降 43.9%、P99 TTFT 降 8.6%；并发 40 时两者分别降 11% 与 13.6%。功能默认关闭，阈值和下一 Prompt 估计需要按负载调参。",
+      "judgment": "它把 Cache Eviction 从纯 Recency 升级为重算成本与尾时延的联合决策，但数字高度依赖会话分布。上线应先回放自己的 Agent Trace，验证被驱逐 Tail 的重算成本和 Quality-of-Service，而不是照搬阈值。",
+      "sources": [
+        {
+          "name": "SGLang PR #34012",
+          "url": "https://github.com/sgl-project/sglang/pull/34012"
+        },
+        {
+          "name": "T-LRU Paper",
+          "url": "https://arxiv.org/abs/2510.15152"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "SMG 还修复 MiniMax M3 视频帧的 Prompt Marker：视频帧应使用 Image Start/End，而不是 Video Marker，以匹配参考实现与 vLLM；Benchmark 配置也更新到 GLM-5.3-Flash 与 MiniMax M3。值得注意的是，TokenTree 仍有一个开放中的并发清理风险：Eviction 在 Unlock 后按 Page Key 删除时，可能误删同 Key 下刚替换的新节点；PR #2568 提议用 remove_if 与 Arc 指针身份校验，但尚未合并，不能视为已修复。SMG 最新 Release 仍为 v1.10.1。",
+    "judgment": "SMG 最近 24–48 小时有实质进展，主线是把模型兼容性从‘请求能跑’提升到 Token Billing、媒体顺序、Tool Arguments 与错误分类的端到端精确契约。下一优先级应是合并并压力验证 TokenTree 并发修复，同时把所有协议 Golden Oracle 纳入 GPU CI，防止模型升级重新引入静默偏差。",
+    "sources": [
+      {
+        "name": "SMG MiniMax M3 Marker #2559",
+        "url": "https://github.com/smg-project/smg/pull/2559"
+      },
+      {
+        "name": "SMG GLM-5.3 Benchmark #2552",
+        "url": "https://github.com/smg-project/smg/pull/2552"
+      },
+      {
+        "name": "SMG MiniMax M3 Benchmark #2553",
+        "url": "https://github.com/smg-project/smg/pull/2553"
+      },
+      {
+        "name": "SMG TokenTree Race #2568（开放）",
+        "url": "https://github.com/smg-project/smg/pull/2568"
+      },
+      {
+        "name": "SMG Releases",
+        "url": "https://github.com/smg-project/smg/releases"
+      }
+    ]
+  },
+  "backend": {
+    "content": "KServe 为 Python Model Server 增加基于标准环境变量的 OpenTelemetry REST/gRPC Trace，并默认跳过常见 Probe；无效配置会告警后关闭 Trace，而不是阻止服务启动。另一项改动支持 --log-format=otel-json，把 Severity、Timestamp、service.name 与 Trace/Span ID 输出到 Stdout；默认 Zap 格式不变。控制面还把无效 HTTPRoute 标为 Terminal InvalidHTTPRoute，停止指数退避事件风暴，直到配置或 Spec 变化。Kueue 同日发布 v0.19.5 与 v0.18.9，修复 Elastic Scale-up Slice 被驱逐时过早释放 Quota、Leader Election 与 Controller 共享限流器导致 Lease Renewal 延迟，以及多项 TAS 一致性问题；升级者还需注意 ComposableJob Load 接口变化。另一个已合并的 Alpha TAS Topology Spreading 可跨域 Spread、域内 Bin-pack。",
+    "judgment": "推理平台的控制面正在补齐可观测性、终止错误与拓扑配额的一致性。KServe Trace/Log 应先验证 Cardinality、Probe 排除和 Collector 故障退化；Kueue Patch 升级则必须回归自定义 Job Integration、Quota 释放时序、Leader Lease 和 TAS Replacement，不能把 Patch 版本当作零风险。",
+    "sources": [
+      {
+        "name": "KServe OTel Tracing #6198",
+        "url": "https://github.com/kserve/kserve/pull/6198"
+      },
+      {
+        "name": "KServe OTel JSON Logs #6112",
+        "url": "https://github.com/kserve/kserve/pull/6112"
+      },
+      {
+        "name": "KServe Invalid Route Terminal #6162",
+        "url": "https://github.com/kserve/kserve/pull/6162"
+      },
+      {
+        "name": "Kueue v0.19.5",
+        "url": "https://github.com/kubernetes-sigs/kueue/releases/tag/v0.19.5"
+      },
+      {
+        "name": "Kueue TAS Topology Spreading #14820",
+        "url": "https://github.com/kubernetes-sigs/kueue/pull/14820"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "运行时 P/D 角色切换实现",
+      "summary": "SGLang PR #28403 展示 Drain-to-idle、角色组件 Tear-down/Rebuild、Decode Graph Capture 与反复切换测试的完整路径。",
+      "judgment": "适合作为推理集群弹性控制面的执行器参考；设计评审应重点补充超时、部分失败、切换幂等和自动策略的安全边界。",
+      "sources": [
+        {
+          "name": "SGLang Role Switching",
+          "url": "https://github.com/sgl-project/sglang/pull/28403"
+        }
+      ]
+    },
+    {
+      "title": "KV-only Memory Release API",
+      "summary": "vLLM PR #44890 将权重常驻、KV 释放、Scheduler Pause 与显式 Wake-up 拆成独立生命周期。",
+      "judgment": "可用于显存借用、低峰收缩和故障维护；建议在平台层封装状态机、操作幂等与恢复前 Health Gate。",
+      "sources": [
+        {
+          "name": "vLLM KV Release",
+          "url": "https://github.com/vllm-project/vllm/pull/44890"
+        }
+      ]
+    },
+    {
+      "title": "HiCache 每 Scheduler Step 批量提交 D2H",
+      "summary": "SGLang 将每 Block 一次 D2H Submit 改为每个 Scheduler Step 一次。提交者在 4×GB300、128 Lane×16 Turn 的特定负载中记录 Submit 从 12,288 次降至约 700 次，L2 吞吐差距从 5.1% 收敛到 2.0%。",
+      "judgment": "这是降低控制面调用频率的典型优化；迁移同类思路时要同时验证 Batch Completion 语义、错误归因与小 Batch 额外等待。",
+      "sources": [
+        {
+          "name": "SGLang PR #39050",
+          "url": "https://github.com/sgl-project/sglang/pull/39050"
+        }
+      ]
+    },
+    {
+      "title": "OpenTelemetry 原生 Model Server",
+      "summary": "KServe PR #6198 给 REST 与 gRPC 请求加入 OTel Span、标准环境变量和 Probe 排除，便于把 Gateway、Model Server 与后端延迟串起来。",
+      "judgment": "适合直接做推理请求关键路径追踪；上线前应设置 Sampling、敏感属性白名单和 Collector 不可用时的资源上限。",
+      "sources": [
+        {
+          "name": "KServe OTel Tracing",
+          "url": "https://github.com/kserve/kserve/pull/6198"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "最近 24–48 小时未核验到足够重大、且有公司一手公告支持的推理基础设施融资或并购，不为凑数收录二手传闻。更明确的产业信号来自开源工程：节点角色、KV 内存、Cache Eviction 和 GPU Graph Shape 都在从静态部署参数变成可编排资源，而协议精确性与错误分类开始直接决定计费、熔断和集群可用性。",
+    "judgment": "下一轮推理平台竞争不只看单卡 Tokens/s，而看能否在不重载权重的前提下重构资源、在满载边界维持性能，并用精确协议契约控制失败半径。采购与自研评估应增加 Role-switch Time、KV Release/Restore、Boundary Batch、4xx Isolation 和 Agentic Tail Latency 五类指标。",
+    "sources": [
+      {
+        "name": "SGLang Runtime Role Switching",
+        "url": "https://github.com/sgl-project/sglang/pull/28403"
+      },
+      {
+        "name": "vLLM KV-only Release",
+        "url": "https://github.com/vllm-project/vllm/pull/44890"
+      },
+      {
+        "name": "SMG Kimi Contract Parity",
+        "url": "https://github.com/smg-project/smg/pull/2564"
+      }
+    ]
+  },
+  "actions": [
+    "在预发用固定模型做 P→D→P 循环：记录 Drain、组件重建、Decode Graph Capture、首 Token 恢复和失败回滚时间，并至少连续切换 100 次观察显存与句柄泄漏。",
+    "为 vLLM KV-only Release 封装 Release/Wake-up 状态机；注入单 Worker 释放失败，确认 Engine Fail-closed，且恢复流量前完成 Scheduler 与 KV Epoch 健康检查。",
+    "对所有自定义 max_num_seqs 扫描上限前后 8 个 Batch Size，比较 FULL 与 PIECEWISE Graph 的吞吐、时延和显存，避免容量边界出现断崖。",
+    "把 SMG 的 Kimi Prompt-token、Raw Tool Arguments、媒体顺序、Streaming Usage 与 Validation 4xx 分类加入真实 vLLM GPU Golden CI，并监控无效请求是否触发重试或熔断。",
+    "审查 SMG TokenTree #2568 的指针身份校验与并发测试；修复合并并通过高并发 Eviction/Replacement 压测前，不要假设同 Key 删除一定指向原节点。",
+    "升级 Kueue v0.19.5 前回归自定义 ComposableJob Load 接口、Elastic Slice Quota 释放、Leader Election 限流隔离和 TAS Replacement；为 KServe OTel 设置 Sampling 与属性白名单。"
+  ]
+}
