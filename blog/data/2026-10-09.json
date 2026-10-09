@@ -1,141 +1,144 @@
 {
   "date": "2026-10-09",
-  "title": "推理网关开始把失控队列、KV 盲路由与协议分叉关进边界",
-  "deck": "SMG 发布 v1.12.0 预发布版并补上默认过载上限；vLLM 加固 Mooncake 元数据查询；SGLang 把受控的 Chat Completions 下沉到 Router。",
+  "title": "推理网关补齐准入边界，Go 安全更新与 KV 正确性值得优先验证",
+  "deck": "截至 2026-10-09 19:46（Asia/Shanghai）：SMG 与 vLLM 的主干修复聚焦准入和 KV 正确性，Go 发布安全更新；SMG v1.12.0 与 Gateway API v1.7.0-rc.1 仍为预发布版。已合并、已发布与开放提案分别标注。",
   "top_items": [
     {
-      "title": "SMG v1.12.0 预发布版打通 Rust Servicer、KV 链式索引与统一工具解析",
-      "summary": "SMG 于 10 月 8 日发布 v1.12.0，GitHub 将其标记为 prerelease。该版本包含 vLLM 与 SGLang 的 Rust gRPC Servicer、SGLang 直连 ZMQ、带状态快照和存活感知路由的 Chain KV Index，以及覆盖多种模型工具调用格式的 Symphony 解析栈；同时带有 Discovery 配置的破坏性变更。",
-      "judgment": "这是一轮架构面扩张，不宜把 prerelease 当作无风险升级。试用时应分别验证引擎 Wire、KV 事件完整性、解析器逐块输出一致性和 Discovery 配置迁移，并保留回退到 v1.11.0 的路径。",
+      "title": "SMG 同时补齐 Router 总量上限与 vLLM Worker 准入窗口",
+      "summary": "今日 12:54 合并的 #2927 将未显式设置的 max-concurrent-requests 默认值设为每个可用 CPU Core 1024、至少 4096；显式 0 仍可关闭上限。19:38 合并的 #2926 让 Python 与 Rust vLLM Servicer 在 GetServerInfo 中报告 max_num_seqs，使 PD 准入门限生效，并增加逐 Decode Worker 的 smg_pd_admission_window 指标；缺失窗口时在注册阶段告警。",
+      "judgment": "Router 全局在途上限与 Decode Worker 窗口约束不同层级。应联合压测内存、排队时延和拒绝率，确认窗口确实被上报，再校准显式上限；这些合并发生在 v1.12.0 预发布之后。",
+      "sources": [
+        {
+          "name": "SMG PR #2927：默认在途上限",
+          "url": "https://github.com/smg-project/smg/pull/2927"
+        },
+        {
+          "name": "SMG PR #2926：vLLM 准入窗口",
+          "url": "https://github.com/smg-project/smg/pull/2926"
+        }
+      ]
+    },
+    {
+      "title": "vLLM 修复不同 P/D Block Size 下的 NIXL 接收后处理",
+      "summary": "#58860 于今日 19:30 合并，修复 Prefill 的 Block Size 小于 Decode 时，接收端 KV 重排、尾部清零维度和重复处理等问题，原问题可能损坏 KV 或导致崩溃。enable_permute_local_kv 仅支持本地 LBNHC 布局，其他布局在握手时拒绝；Gemma 4 的剩余正确性问题仍依赖其他修复。PR 中的测试结果由作者提供，本报未独立复现。",
+      "judgment": "先覆盖 Block Size 比例、KV Head 数、布局与模型组合，对比 Token 和 Logprob，再评估吞吐。一次接收后处理修复不能作为整个模型或跨布局链路已验证的依据。",
+      "sources": [
+        {
+          "name": "vLLM PR #58860",
+          "url": "https://github.com/vllm-project/vllm/pull/58860"
+        }
+      ]
+    },
+    {
+      "title": "Go 1.27.2 与 1.26.9 发布安全修复",
+      "summary": "Go 官方于 10 月 8 日发布 1.27.2 与 1.26.9，安全修复涉及 go 命令以及 crypto/tls、html/template、net/http、net/textproto、os 包。官方发布历史同时列出各版本的其他缺陷修复。",
+      "judgment": "按现有版本线更新 CI 工具链和构建镜像，重建并部署受影响服务。只更新开发机无法替换已上线二进制中的标准库；具体漏洞影响仍应结合公告和实际代码路径核查。",
+      "sources": [
+        {
+          "name": "Go 官方发布历史",
+          "url": "https://go.dev/doc/devel/release"
+        },
+        {
+          "name": "Go 官方下载",
+          "url": "https://go.dev/dl/"
+        }
+      ]
+    },
+    {
+      "title": "Gateway API v1.7.0-rc.1 将重试配置纳入 Standard Channel",
+      "summary": "Gateway API v1.7.0-rc.1 已发布，GitHub 仍标记为 prerelease。发布说明将 retry.codes、retry.attempts 与 retry.backoff 一并提升到 Standard Channel；具体退避曲线和 Jitter 仍由实现决定。",
+      "judgment": "字段进入 Standard Channel 与候选版本成为稳定版是两回事。试用前核对控制器支持，并联合验证重试次数、总超时和请求幂等性，防止网关与 SDK 多层重试放大负载。",
+      "sources": [
+        {
+          "name": "Gateway API v1.7.0-rc.1 Release",
+          "url": "https://github.com/kubernetes-sigs/gateway-api/releases/tag/v1.7.0-rc.1"
+        }
+      ]
+    },
+    {
+      "title": "SMG v1.12.0 预发布：区分版本能力与今日后续修复",
+      "summary": "SMG v1.12.0 于上海时间今日 02:08 发布，标记为 prerelease，包含 Chain KV Index、快照中继、存活感知的缓存路由及 Rust Servicer 等能力。本文列出的默认在途上限、vLLM 准入窗口、启动预算和重试指标修复均在该版本发布后合并。",
+      "judgment": "试用时固定版本或 Commit，并逐项确认所需修复已包含。不要仅凭 v1.12.0 标签推断今日主干修复已经交付；缓存状态、Worker 存活与协议兼容需要分别验证。",
       "sources": [
         {
           "name": "SMG v1.12.0 Release",
           "url": "https://github.com/smg-project/smg/releases/tag/v1.12.0"
         }
       ]
-    },
-    {
-      "title": "SMG 为默认配置加上按 CPU 推导的在途请求上限",
-      "summary": "此前未设置 --max-concurrent-requests 时，Router 会接纳全部请求，持续过载下积压请求保留 Body 与 Token Encoding，直到内存耗尽。合并后的默认值为每个可用 Core 1024、至少 4096；越过队列边界后返回带 Retry-After 的 429/503。显式 0 仍可关闭限制。",
-      "judgment": "默认有界比默认无限更适合生产，但 1024/Core 只是防 OOM 的兜底，不是容量规划。应以请求体大小、Prompt Token、排队时延和 Router 内存共同校准显式上限，并让客户端正确退避。",
-      "sources": [
-        {
-          "name": "SMG PR #2927",
-          "url": "https://github.com/smg-project/smg/pull/2927"
-        }
-      ]
-    },
-    {
-      "title": "vLLM 为 Mooncake Bootstrap 元数据查询加超时与重试",
-      "summary": "MooncakeConnector 查询 Prefiller 元数据时现在设置 60 秒 HTTP 超时，并对 httpx.RequestError 最多尝试 3 次、间隔 100 毫秒；失败日志会记录尝试次数和异常类型，原有元数据处理与完成通知不变。",
-      "judgment": "这能覆盖慢响应和瞬时连接失败，但固定 100 毫秒间隔可能在大规模同时恢复时形成同步重试。部署方仍应监控 Bootstrap 延迟与失败率，并在 Prefiller 端验证请求是否具备幂等性。",
-      "sources": [
-        {
-          "name": "vLLM PR #55923",
-          "url": "https://github.com/vllm-project/vllm/pull/55923"
-        }
-      ]
-    },
-    {
-      "title": "SGLang Router 在严格 Gate 下直接处理 Chat Completions",
-      "summary": "SGLang 将 /v1/chat/completions 接入 Router 的 /generate 路径，补齐 Prompt 渲染、Reasoning 拆分、流式响应和采样默认值。只有 Renderer 已验证、Router 与 Worker 的 Chat Template 参数一致、且请求不含工具或媒体时才下沉；其他请求继续走引擎原路由。",
-      "judgment": "这类协议下沉的关键不是少一次转发，而是保持 Python 与 Rust 路径语义一致。上线前应按 Thinking、续写、Logprobs、n、流式 Usage 和回退 Gate 做逐响应对比，尤其不要把无工具的通过结果外推到 Tool Calling。",
-      "sources": [
-        {
-          "name": "SGLang PR #42998",
-          "url": "https://github.com/sgl-project/sglang/pull/42998"
-        }
-      ]
     }
   ],
   "engineering": {
-    "content": "SMG 最近 24–48 小时有实质进展。除 v1.12.0 外，Rust Servicer 默认开启 SGLang 与 TokenSpeed 的 KV Event Publisher，避免 Router 已订阅事件但后端不发布而静默盲路由；显式配置和环境变量仍可关闭。Gateway 在某模型最后一个 Worker 离开时会立即把模型级 KV Index Gauge 清零，避免旧 Block 数长期残留。Worker Retry Backoff 指标则从不可跨实例聚合的 Summary 修正为覆盖 10 毫秒到 60 秒的 Histogram，指标名保持不变。",
-    "judgment": "这一组改动共同指向可观测的 Cache-aware Routing：事件源默认可用、Worker 消失时状态归零、重试分布可以聚合。升级后应同时告警无 KV 事件 Worker、最后 Worker 下线后的 Gauge 残留，以及 Backoff Bucket 的分布变化，不能只验证请求成功率。",
+    "content": "SGLang #42998 于今日 19:17 合并，将 Chat Completions 下沉到 Router 的 /generate 路径，但仅限已验证的 AllText DeepSeek-V4 Renderer、Router 与 Worker 的模板参数一致、且无工具或媒体的请求，其余回退引擎原路由。SMG #2972 于 19:13 合并，让握手消息或引擎存活报告刷新默认 1800 秒的静默预算，同时保留默认 4 小时的总启动上限（设为 0 可关闭总上限）。19:14 合并的 #2968 将 Worker 重试退避指标从 Summary 改为 Histogram，桶覆盖 10 毫秒至 60 秒。",
+    "judgment": "协议下沉按 Gate 做正反例回归，避免把纯文本结果外推到工具或多模态。存活信号不能证明加载在推进，应保留总启动上限并观测阶段进度；指标类型变化后同步核对面板聚合和告警表达式。",
     "sources": [
       {
-        "name": "SMG SGLang KV Events #2939",
-        "url": "https://github.com/smg-project/smg/pull/2939"
+        "name": "SGLang PR #42998：受控 Chat 下沉",
+        "url": "https://github.com/sgl-project/sglang/pull/42998"
       },
       {
-        "name": "SMG TokenSpeed KV Events #2940",
-        "url": "https://github.com/smg-project/smg/pull/2940"
+        "name": "SMG PR #2972：启动静默预算与总上限",
+        "url": "https://github.com/smg-project/smg/pull/2972"
       },
       {
-        "name": "SMG KV Gauge Cleanup #2929",
-        "url": "https://github.com/smg-project/smg/pull/2929"
-      },
-      {
-        "name": "SMG Retry Histogram #2968",
+        "name": "SMG PR #2968：重试退避直方图",
         "url": "https://github.com/smg-project/smg/pull/2968"
       }
     ]
   },
   "backend": {
-    "content": "Kubernetes Gateway API 已将 HTTPRoute 的 retry.codes 与 retry.attempts 晋升到 Standard Channel，Backoff 因语义仍在讨论而继续保持 Experimental；这意味着实现之间可以围绕重试条件和次数形成稳定契约，但退避策略尚不能假定可移植。Kueue 同日修复同一 ClusterQueue 内的抢占：当高优先级 Workload 需要借用配额且 withinClusterQueue 允许时，现在可以考虑抢占本队列低优先级 Workload。Go 与 Rust 最近 24–48 小时未见需要占据头条的新稳定版本。",
-    "judgment": "Gateway 重试标准化会把上游错误放大风险带到配置层，应同时设置 Attempt、超时与幂等边界；Backoff 仍需按实现验收。Kueue 修复会改变特定借用场景的 Victim 选择，升级前应回放带优先级和 Cohort 借用的队列。",
+    "content": "今日后端维护优先级是 Go 两条版本线的安全更新，以及 Gateway API 候选版本中的重试语义。Go 1.27.2 / 1.26.9 已正式发布；Gateway API v1.7.0-rc.1 仍处于预发布状态，其 Standard Channel 字段也需要具体控制器正确实现。",
+    "judgment": "将安全补丁与功能试用分开推进：先完成构建产物更新和服务回归，再在隔离环境验证网关重试。记录客户端、网关和上游各层预算，确保一次请求的总耗时与额外尝试次数可控。",
     "sources": [
       {
-        "name": "Gateway API PR #5350",
-        "url": "https://github.com/kubernetes-sigs/gateway-api/pull/5350"
+        "name": "Go 官方发布历史",
+        "url": "https://go.dev/doc/devel/release"
       },
       {
-        "name": "Kueue PR #16060",
-        "url": "https://github.com/kubernetes-sigs/kueue/pull/16060"
+        "name": "Gateway API v1.7.0-rc.1 Release",
+        "url": "https://github.com/kubernetes-sigs/gateway-api/releases/tag/v1.7.0-rc.1"
       }
     ]
   },
   "resources": [
     {
-      "title": "SMG Chain KV Index",
-      "summary": "v1.12.0 收录的 Chain Index 将 KV 事件按状态链维护，支持状态快照与 Worker 存活感知，为事件丢失后的恢复和 Cache-aware Routing 提供更明确的状态模型。",
-      "judgment": "值得用故障注入验证，而不是只跑稳态吞吐：中断事件流、重连、Worker 重启和快照恢复后，路由决策必须与真实 Cache 状态重新收敛。",
+      "title": "SGLang 外部 L3 缓存读取失败隔离：仍为开放提案",
+      "summary": "#40896 截至截稿仍未合并。提案将外部缓存读取放入请求私有 Device Slots，跨 Rank 确认成功后才发布到 Radix Tree；失败请求返回 503，避免其他请求复用未就绪 KV。作者提供了故障注入结果，本报未独立复现。",
+      "judgment": "值得参考其“加载完成后再发布”的正确性边界。评估时验证跨 Rank 一致性、失败清理与后续同 Prompt 请求，勿将开放 PR 写入已上线修复清单。",
       "sources": [
         {
-          "name": "SMG PR #2814",
-          "url": "https://github.com/smg-project/smg/pull/2814"
+          "name": "SGLang PR #40896（Open）",
+          "url": "https://github.com/sgl-project/sglang/pull/40896"
         }
       ]
     },
     {
-      "title": "Gateway API 标准化 HTTP Retry 字段",
-      "summary": "HTTPRoute 的 Retry Code 与 Attempt 已进入 Standard Channel，而 Backoff 保持 Experimental；该拆分清楚标出了跨实现承诺与仍在演化的部分。",
-      "judgment": "可用它审查 Mesh/Gateway 的可移植配置，但要在每个实现上单独验证 Backoff、总超时与非幂等请求处理。",
+      "title": "govulncheck：补丁验证的常用工具",
+      "summary": "Go 官方 govulncheck 可结合代码可达性分析已知漏洞，帮助缩小需要人工复核的影响范围。它是成熟的既有工具，本日并无据此宣称的新版本发布。",
+      "judgment": "将扫描纳入升级前后的 CI 检查，并结合实际构建配置与运行方式复核。无报告不构成完整安全证明，也不能替代工具链升级和服务重建。",
       "sources": [
         {
-          "name": "Gateway API PR #5350",
-          "url": "https://github.com/kubernetes-sigs/gateway-api/pull/5350"
+          "name": "Go 官方漏洞管理文档",
+          "url": "https://go.dev/doc/security/vuln/"
         }
       ]
     }
   ],
   "industry": {
-    "content": "最近 24–48 小时未核验到足够重大、且有公司一手公告支持的推理基础设施融资或并购，不用传闻凑数。工程信号更明确：推理网关正在把此前隐式的无限排队、KV 事件可用性、协议下沉条件和重试语义改成可配置、可观测、可回退的边界。",
-    "judgment": "采购或自建推理平台时，应把故障边界列为和峰值吞吐同等重要的验收项：默认队列是否有界、Cache 路由失去事件时是否显式降级、协议快路径是否有 Gate、跨服务重试是否受总预算约束。",
+    "content": "NVIDIA 于 10 月 8 日宣布，未来五年将投入总值 10 亿美元的承诺，支持美国科学研究、高校研究机构、量子计算及服务政府任务的云服务商生态。",
+    "judgment": "这是多年期资源承诺。跟踪价值在于后续项目、资源开放方式和实际交付节奏；现有公告不足以推导已交付 GPU 数量、即时推理容量或 API 降价。",
     "sources": [
       {
-        "name": "SMG Admission Bound",
-        "url": "https://github.com/smg-project/smg/pull/2927"
-      },
-      {
-        "name": "vLLM Mooncake Retry",
-        "url": "https://github.com/vllm-project/vllm/pull/55923"
-      },
-      {
-        "name": "SGLang Router Chat",
-        "url": "https://github.com/sgl-project/sglang/pull/42998"
-      },
-      {
-        "name": "Gateway API HTTP Retry",
-        "url": "https://github.com/kubernetes-sigs/gateway-api/pull/5350"
+        "name": "NVIDIA 官方：未来五年支持美国科学研究",
+        "url": "https://nvidianews.nvidia.com/news/nvidia-commits-1-billion-to-advance-us-science-over-the-next-five-years"
       }
     ]
   },
   "actions": [
-    "在预生产升级 SMG v1.12.0，分别回放 vLLM/SGLang Rust Servicer、Discovery 配置迁移、Symphony 工具流和 Chain KV Index 快照恢复；确认 prerelease 回退路径。",
-    "对 SMG Router 做两倍稳态容量的开环压测，记录默认在途上限、内存平台期、429/503 比例、Retry-After 与客户端退避效果，再决定显式上限。",
-    "模拟 SGLang/TokenSpeed KV Event 断流和最后 Worker 下线，确认 Router 能识别无事件后端、模型 Gauge 立即归零且路由不继续使用陈旧 Cache 状态。",
-    "为 vLLM Mooncake Bootstrap 注入慢响应、连接重置和 Prefiller 重启，核对三次尝试、60 秒超时、日志可诊断性与请求幂等性。",
-    "对 SGLang Router Chat 快路径运行 Python/Rust 响应差分；把工具、媒体和 Template 参数不一致的请求纳入回退测试。",
-    "在 Gateway API 与 Kueue 的测试集群分别回放 HTTP 重试预算和同队列借用抢占，观察非幂等副作用、尾延迟与 Victim 选择。"
+    "按当前 Go 版本线升级到 1.27.2 或 1.26.9，更新 CI 和构建镜像，运行 govulncheck，并重建、回归和部署相关服务。",
+    "为 SMG 固定已核查的版本或 Commit，分别验证 Router 在途上限与 vLLM Worker 窗口，压测内存、队列时延、429/503 和窗口指标。",
+    "为 NIXL 建立 P/D Block Size、KV Head 数与布局的正确性矩阵，对比 Token / Logprob；把不支持布局的握手拒绝和 Gemma 4 剩余问题纳入验收。",
+    "回归 SGLang Chat 下沉的纯文本、模板参数一致性和流式语义，并验证工具、媒体及不满足 Gate 的请求确实回退。",
+    "仅在测试环境评估 Gateway API 候选版本，联合校验重试次数、总超时、幂等性与退避行为，排查 SDK 和网关叠加重试。",
+    "测试 SMG 慢启动、静默失败和持续存活但无进展三类边界，保留合理总上限，并将重试退避面板迁移到 Histogram 聚合。"
   ]
 }
