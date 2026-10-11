@@ -1,0 +1,125 @@
+{
+  "date": "2026-10-11",
+  "title": "Mesh 健康需验证真实连通，混合 KV 恢复与 RDMA 完成语义成为重点",
+  "deck": "截至 2026-10-11 09:03（Asia/Shanghai）：SMG 修复 mTLS Mesh 启动，SGLang 补齐混合 MLA/KDA 的 L3 恢复，vLLM 修正 Offload 槽位映射。主干合并不等于正式版已包含；文中测试来自项目报告，本报未独立复现。",
+  "top_items": [
+    {
+      "title": "SMG：/health 返回 200，也可能没有启动 mTLS Mesh",
+      "summary": "10 月 11 日 02:47 合并的 #3096 修复同时链接 ring 与 aws-lc-rs 时，rustls 无法自动选择 CryptoProvider、Mesh listener 任务 panic 的问题。现在启动最前面幂等安装 Provider，覆盖二进制与 Python binding，并移除 HTTPS listener 的重复安装。",
+      "judgment": "健康探针不能代替集群连通验收。升级后同时检查 TLS 握手、Peer 连接、Worker 传播及远端 Worker 实际请求，并确认无客户端证书和外部 CA 证书仍被拒绝。",
+      "sources": [
+        {
+          "name": "SMG #3096",
+          "url": "https://github.com/smg-project/smg/pull/3096"
+        }
+      ]
+    },
+    {
+      "title": "SGLang：混合 MLA/KDA 的恢复点必须是跨 Rank 公共 Checkpoint",
+      "summary": "10 月 11 日 07:07 合并的 #41591 支持混合 MLA/KDA 的 DCP 与 File/Mooncake L3：共享 MLA 对象，同时保留各 TP Rank 独立 KDA 状态。恢复取所有 Rank 都有的最长 Checkpoint，例如 {512,1024} 与 {512,768} 的公共点为 512。作者报告 H200 上冷暖输出 IDs 一致；GB300 与性能未重跑。",
+      "judgment": "不要把各 Rank 最长命中的最小值当作公共恢复点。回归部分 KDA/MLA 缺失和 Reader 重启；当前支持受既定 MLA 布局约束，不应外推到 GQA/MHA、其他 Host Pool 或分离 KV/Scale Buffer。",
+      "sources": [
+        {
+          "name": "SGLang #41591",
+          "url": "https://github.com/sgl-project/sglang/pull/41591"
+        }
+      ]
+    },
+    {
+      "title": "vLLM：Offload 共享内存槽位按 Worker Rank 映射",
+      "summary": "10 月 10 日 20:25 合并的 #58497 修正 CPU 与 Tiering Offload 非 replicated layout 的 Slot 选择，从物理 Device Index 对 World Size 取模改为 parallel.rank；replicated layout 仍用 Slot 0。设备编号与 Rank 不一致时，旧逻辑可能读写错误槽位。",
+      "judgment": "在非连续 GPU 分配、设备重编号和多进程启动场景回放写入与恢复，比较输出一致性。这是缓存正确性修复，不能直接推导吞吐提升。",
+      "sources": [
+        {
+          "name": "vLLM #58497",
+          "url": "https://github.com/vllm-project/vllm/pull/58497"
+        }
+      ]
+    },
+    {
+      "title": "Mooncake：RDMA 批量 Completion 可选开启，先验证失败语义",
+      "summary": "10 月 10 日 22:57 合并的 #4542 为 Classic RdmaTransport 增加 MC_RDMA_SIGNAL_INTERVAL；默认 1 保留逐 WR CQE，较大值通过每 QP FIFO 合并完成处理。作者在同机 H20、mlx5、4KiB READ 微基准中报告收益，但同时调整了 MC_MAX_WR，且 Flush/Teardown、Partial-post Failure 等集成路径尚未覆盖。",
+      "judgment": "Provider 必须为失败或 Flush 的 unsignaled WR 产生 CQE，否则保持默认 1。先验证故障完成、队列清理和尾延迟，再灰度扩大 Interval；不要将微基准收益写成模型吞吐收益。",
+      "sources": [
+        {
+          "name": "Mooncake #4542",
+          "url": "https://github.com/kvcache-ai/Mooncake/pull/4542"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "SMG #3071 于 10 月 11 日 04:56 合并，为 gRPC Worker 的 /v1/messages/count_tokens 使用网关 Tokenizer 与共享 MessagesPrompt 渲染，并补充模型查询接口；图片仅计模板 Placeholder，不抓取或预处理媒体，不能视作完整视觉 Token 估算。#3108 当前仍开放，提议将坏媒体 URL 等请求错误与 Worker 自身故障分开，避免前者触发健康 Worker 熔断。已抽查近期 PR、合并、重要 Issue 与 Release；最新 SMG Release 仍为 10 月 9 日发布的 v1.12.0，以上新合并不能视为已进入该版本。",
+    "judgment": "Token 计数应与实际请求渲染、文本和工具使用量对照；媒体路径独立验收。错误分类同时影响状态码、重试与熔断，不宜只修改 HTTP 返回码。开放 PR 仅用于设计跟踪，不作为已上线能力。",
+    "sources": [
+      {
+        "name": "SMG #3071",
+        "url": "https://github.com/smg-project/smg/pull/3071"
+      },
+      {
+        "name": "SMG #3108（开放）",
+        "url": "https://github.com/smg-project/smg/pull/3108"
+      },
+      {
+        "name": "SMG v1.12.0",
+        "url": "https://github.com/smg-project/smg/releases/tag/v1.12.0"
+      }
+    ]
+  },
+  "backend": {
+    "content": "GitHub 10 月 9 日公布 CodeQL 2.27.2：Go CFG 迁移至共享库，节点、边和基本块边界变化可能影响自定义查询；新增 coder/websocket 建模，Rust 改进 async/await 数据流与 native-tls 摘要。编译型语言的 autobuild/manual 分析不支持 macOS 27，也不支持 macOS 26 搭配 Xcode 27。复查 Go/Rust 官方发布记录未见 10 月 9 日以来新的稳定版；Kubernetes 官方博客最新条目仍为 10 月 6 日，今日不重复这些旧闻。",
+    "judgment": "先以现有代码库回归 Go 自定义查询，再升级 CodeQL 与 CI 镜像，区分扫描器变化和真实新增告警。官方博客未更新不代表 Kubernetes 生态无进展，本栏仅陈述所查来源范围。",
+    "sources": [
+      {
+        "name": "CodeQL 2.27.2 官方公告",
+        "url": "https://github.blog/changelog/2026-10-09-codeql-2-27-2-improves-c-go-rust-and-javascript-analysis/"
+      },
+      {
+        "name": "Go 发布历史",
+        "url": "https://go.dev/doc/devel/release"
+      },
+      {
+        "name": "Rust 官方博客",
+        "url": "https://blog.rust-lang.org/"
+      },
+      {
+        "name": "Kubernetes 官方博客",
+        "url": "https://kubernetes.io/blog/"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "vLLM Draft：原生 OffloadingConnector 扩展 Partial-tail 保存",
+      "summary": "10 月 11 日 01:52 创建的 #61019 仍为 Draft，将 EAGLE/MTP 与 align-Mamba Partial Tail 从 Mooncake 路径扩展到原生 OffloadingConnector，并修正 CoW Hand-off 使用旧 Token 数判断的问题。作者报告 A100 CUDA 回归通过，但 TTFT/TPOT、重计算与 Acceptance Length 验证仍待完成。",
+      "judgment": "这是昨日外部缓存主题的新实现路径，适合阅读正确性测试。成功命中部分尾块与改善线上 SLO 是两层验收，不能用前者替代后者。",
+      "sources": [
+        {
+          "name": "vLLM #61019（Draft）",
+          "url": "https://github.com/vllm-project/vllm/pull/61019"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "AWS DevOps Agent 的 10 月 9 日更新增加调查质量 Review：对已完成的调查按需评价，提供 helpful/not helpful 总结及分项结果。Review 阅读问题、已有证据和结论，不重跑或修改原调查。",
+    "judgment": "运维 Agent 产品开始将结果评价纳入工作流，这是值得观察的工程方向；但评价本身不是独立重现根因。可以用历史故障构建评测集，同时保留生产证据复核和人工验收，不从功能公告推导收入或投资回报。",
+    "sources": [
+      {
+        "name": "AWS DevOps Agent 更新记录",
+        "url": "https://docs.aws.amazon.com/devopsagent/latest/userguide/whats-new.html"
+      },
+      {
+        "name": "AWS 调查 Review 机制",
+        "url": "https://docs.aws.amazon.com/devopsagent/latest/userguide/working-with-devops-agent-reviewing-investigations.html"
+      }
+    ]
+  },
+  "actions": [
+    "把 SMG Mesh 的 TLS 握手、Peer 连接、Worker 传播与真实请求纳入部署验收，避免仅依赖 /health。",
+    "为混合 MLA/KDA 缓存建立跨 Rank 不同 Checkpoint 集及部分数据缺失的恢复用例。",
+    "回归非连续 GPU 编号下 vLLM CPU/Tiering Offload 的槽位映射和输出一致性。",
+    "Mooncake 批量 Completion 先保持默认值，确认 RDMA Provider 失败/Flush CQE 语义及清理测试后再灰度。",
+    "升级 CodeQL 前验证 Go 自定义查询及 macOS/Xcode 组合；对 Partial-tail Draft 分开跟踪正确性与 SLO 证据。"
+  ]
+}
