@@ -1,0 +1,125 @@
+{
+  "date": "2026-10-12",
+  "title": "中文流式输出修回字符边界，缓存正确性与故障隔离优先",
+  "deck": "截至 2026-10-12 09:00（Asia/Shanghai）：SMG 修复中文流式首段延迟回归并限制 allocator arenas；SGLang 补强 Mamba 缓存与 HiCache 异常处理，vLLM 对齐 EAGLE 滑窗缓存边界。以下合并属于主干进展，不等于已进入稳定版；项目测试未由本报独立复现。",
+  "top_items": [
+    {
+      "title": "SMG：ByteFallback 按完整字符输出，避免整段中文被缓冲",
+      "summary": "10 月 12 日 06:30 合并的 #3177 修复 #3144 引入的流式回归：CJK/emoji 的 ByteFallback 字节应在形成完整字符后输出，而非等整个 byte run 结束。项目用 67 个 CJK 字符、20ms/token 的 mock probe 报告首 delta 从 4273ms 降至 68ms。",
+      "judgment": "这是特定词表与模拟流的首段可见性改善，不能外推为模型吞吐提升。回归中文、emoji、混合文本及跨 chunk 字节边界；非法字节恢复时保留已流出文本，最终输出不保证与批量 decode 完全一致，应检查 recovery 指标。",
+      "sources": [
+        {
+          "name": "SMG #3177",
+          "url": "https://github.com/smg-project/smg/pull/3177"
+        }
+      ]
+    },
+    {
+      "title": "SMG：固定 16 个 jemalloc arenas，控制多核网关 RSS",
+      "summary": "10 月 11 日 21:27 合并的 #3141 将 jemalloc arenas 固定为 16，以缓解多核、多线程下 slab 碎片。项目在 29 个 mock workers、约 245 req/s 的多租户多轮负载中报告，15–20 分钟 RSS 从 1184–1188MB 降至 474–478MB，CPU/request 基本处于同一区间。",
+      "judgment": "数字来自网关模拟负载，不代表所有分配模式。部署时同时观察 RSS、分配器碎片、CPU 与尾延迟；内存收益不能替代长时间生产流量验证。",
+      "sources": [
+        {
+          "name": "SMG #3141",
+          "url": "https://github.com/smg-project/smg/pull/3141"
+        }
+      ]
+    },
+    {
+      "title": "SGLang：避免旧 Mamba checkpoint 对应已被覆写的状态",
+      "summary": "10 月 11 日 21:12 合并的 #43567 修复 lazy Mamba tracking 在 pending slot 分配失败、退回原地覆盖时未使旧 checkpoint 长度失效的问题，避免将覆写状态按旧前缀重新缓存。作者 GB300/Qwen3.5-0.8B 回归只覆盖普通 decode，未覆盖 speculative verify。",
+      "judgment": "缓存命中率正常也可能掩盖状态污染。用紧张 slot 配额、overlap 与 CUDA graph 组合比较冷暖输出，再单独补 speculative verify 测试，不能将普通 decode 通过视作全路径正确。",
+      "sources": [
+        {
+          "name": "SGLang #43567",
+          "url": "https://github.com/sgl-project/sglang/pull/43567"
+        }
+      ]
+    },
+    {
+      "title": "vLLM × Mooncake：EAGLE 滑窗保留边界与 core 对齐",
+      "summary": "10 月 11 日 17:15 合并的 #61012 修复 Mooncake 使用 EAGLE retention mask 却配非 EAGLE replay boundary 的不一致。非 block-aligned prompt 可能少保留一块 sliding-window tail，使联合 cache hit 降到 0；现在复用 core 的 replay_boundaries()。这是昨日 Partial-tail Draft 之外的独立边界修复。",
+      "judgment": "针对 full-attention target 加 sliding-window EAGLE drafter，回归块对齐与非对齐 prompt 以及 prefix_cache_retention_interval=0。区分保留策略、命中率与实际 TTFT；不要把该修复描述成改变模型计算结果。",
+      "sources": [
+        {
+          "name": "vLLM #61012",
+          "url": "https://github.com/vllm-project/vllm/pull/61012"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "SGLang #43550 于 10 月 11 日 22:26 合并，将后端异常容错扩到所有配置：预取失败按 miss 处理，备份失败仍 ack，避免 worker 退出后请求永久等待或 host pages 持续锁住；作者仅报告单卡 H200/file backend 故障注入。SMG #3143 于 10 月 12 日 01:40 合并 Gemma 4 原生 tools/reasoning/audio references 支持，但显式 gemma4 parser 的 required/named 无 decoding grammar，仍为 best-effort，且没有 live-engine/GPU qualification。本轮检查了 SMG 近期 PR、合并、Issue 与 Release；最新 Release 仍为 v1.12.0，不能把这些后续合并当作该版本既有能力。",
+    "judgment": "缓存存储异常应降级而非拖死服务，但单卡容错不能证明多 Rank 故障隔离。工具调用约束要在调用端校验函数名与参数；解析器识别与模型严格服从是两件事。",
+    "sources": [
+      {
+        "name": "SGLang #43550",
+        "url": "https://github.com/sgl-project/sglang/pull/43550"
+      },
+      {
+        "name": "SMG #3143",
+        "url": "https://github.com/smg-project/smg/pull/3143"
+      },
+      {
+        "name": "SMG v1.12.0",
+        "url": "https://github.com/smg-project/smg/releases/tag/v1.12.0"
+      }
+    ]
+  },
+  "backend": {
+    "content": "在 10 月 10 日 09:00 至 10 月 12 日 09:00（Asia/Shanghai）的窗口内，本轮核验的 Go、Rust、Kubernetes 官方博客未检出新文章；这一结论仅限所查博客，不代表生态没有提交或版本变化。已有工具复查：Clippy 官方文档明确不宜整组启用 restriction，应逐项选择；这不是今日新增功能。",
+    "judgment": "周末不以低价值旧闻填充。可将 Rust 网关的 lint 例外按理由逐项审查，保持 CI 规则可解释；不要为追求规则数量引入相互矛盾的限制。",
+    "sources": [
+      {
+        "name": "Go 官方博客",
+        "url": "https://go.dev/blog/"
+      },
+      {
+        "name": "Rust 官方博客",
+        "url": "https://blog.rust-lang.org/"
+      },
+      {
+        "name": "Kubernetes 官方博客",
+        "url": "https://kubernetes.io/blog/"
+      },
+      {
+        "name": "Clippy 官方文档",
+        "url": "https://doc.rust-lang.org/clippy/"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "vLLM 长上下文 indexer TP 分片：收益必须连同触发条件阅读",
+      "summary": "10 月 11 日 22:43 合并的 #54951 将 GLM-5.3-Flash prefill sparse-indexer 的 query rows 按成本分给 TP ranks，保留完整 key history，all_gatherv 合并 int32 indices；decode kernels 未改。作者在 4×H200、TP4、C1、legacy runner+显式 FA3、batch token budget 65536 下，报告 1M 输入 TTFT 从 54.154 秒降至 40.388 秒。",
+      "judgment": "激活要求当前 batch scheduled prefill rows ≥16384×TP；TP4 配 8192 即使累计上下文 1M 也不激活。该结果不能推广到默认 runner/backend 或饱和并发吞吐，复测时必须保存完整启动参数。",
+      "sources": [
+        {
+          "name": "vLLM #54951",
+          "url": "https://github.com/vllm-project/vllm/pull/54951"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "本轮核验的 OpenAI、Anthropic 官方公告列表中，尚未找到可确认属于近 48 小时的重大产业新公告；本栏不将周末转载时间当成原始发布时间，也不重复前日报告的运维 Agent 更新。",
+    "judgment": "缺少新增公告时不据此判断产业放缓。今日更值得投入的是对上述开源主干变更做小范围验收，以真实故障率、首段延迟及资源占用判断工程价值，而非从单项功能推导商业回报。",
+    "sources": [
+      {
+        "name": "OpenAI 官方公告",
+        "url": "https://openai.com/news/?topics=announcements"
+      },
+      {
+        "name": "Anthropic 官方新闻",
+        "url": "https://www.anthropic.com/news"
+      }
+    ]
+  },
+  "actions": [
+    "为中文、emoji 与混合文本建立跨 chunk 字节边界回放，比较首 delta 与最终文本完整性。",
+    "在真实网关流量下观察固定 arenas 后的 RSS、CPU 和尾延迟，不直接套用 mock 数据。",
+    "用 slot 耗尽场景验证 Mamba checkpoint 冷暖一致性，并单独覆盖 speculative verify。",
+    "对 HiCache 注入预取和备份异常，检查请求降级、host pages 解锁及 worker 存活。",
+    "回归 EAGLE 滑窗缓存的对齐/非对齐 prompt；评估 TP indexer 优化前核对 batch rows 触发门槛。"
+  ]
+}
