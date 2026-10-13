@@ -1,0 +1,132 @@
+{
+  "date": "2026-10-13",
+  "title": "租户隔离落到历史记录，缓存命中与路由收益重新验真",
+  "deck": "截至 2026-10-13 09:00（Asia/Shanghai）：SMG 补齐历史记录租户隔离，纠正 P/D 缓存用量并调整小池路由；vLLM 扩展长上下文验证计算，Mooncake 推进统一 EFA 构建。文中主干合并不代表稳定版已包含，性能数字来自项目报告，未由本报独立复现。",
+  "top_items": [
+    {
+      "title": "SMG：历史记录按创建租户隔离，但旧记录不会自动变私有",
+      "summary": "10 月 13 日 00:55 合并的 #3222 将租户写入 Responses、Conversations 及 items，并在按 ID 访问时校验；跨租户访问按未知 ID 处理。SQL 历史 schema 升至 migration 4。历史记录及没有租户身份的记录仍保留原有共享行为。",
+      "judgment": "升级代码不足以自动隔离历史数据。应核对可信租户身份来源、数据库迁移和旧记录处置，并回归读取、续写、取消、删除与 item_reference；未配置租户身份的部署仍不提供这层隔离。",
+      "sources": [
+        {
+          "name": "SMG #3222",
+          "url": "https://github.com/smg-project/smg/pull/3222"
+        }
+      ]
+    },
+    {
+      "title": "SMG：P/D cached_tokens 回到真实前缀命中，不能再用 KV 搬运量代替",
+      "summary": "10 月 13 日 00:55 合并的 #3286 改为使用 Prefill 侧前缀缓存命中，替换 Decode 侧接收 KV 的计数。此前分离路径常报告 prompt_tokens−1，令用量推导的命中率接近 100%。smg_engine_cache_hit_rate 等 Prometheus 引擎指标未变。",
+      "judgment": "先修正每租户用量和缓存成本报表的语义，再比较升级前后命中率。vLLM 路径有部署验证，SGLang/TokenSpeed 仅脚本单测；应分别回归流式最终用量、连续用量和非流式响应。",
+      "sources": [
+        {
+          "name": "SMG #3286",
+          "url": "https://github.com/smg-project/smg/pull/3286"
+        }
+      ]
+    },
+    {
+      "title": "SMG：小池缓存亲和终于能溢出调度，但 TTFT 代价尚未解决",
+      "summary": "10 月 13 日 01:07 合并的 #3294 让绝对负载差门限随池均值缩放，并保留配置上限及相对门限，避免默认 64 请求差在小池永远触发不了。作者两引擎、32 客户端测试中 spill 开始触发，但 TTFT p50 从 251ms 到 258ms，同组轮询为 155ms。",
+      "judgment": "这是使平衡机制生效，不是普遍加速。亲和带来的瞬时突发可能使缓存收益与首 token 延迟冲突；同时看分支触发率、负载差、命中率、吞吐及 TTFT，不能只以命中率选策略。",
+      "sources": [
+        {
+          "name": "SMG #3294",
+          "url": "https://github.com/smg-project/smg/pull/3294"
+        }
+      ]
+    },
+    {
+      "title": "vLLM：短多 query 验证可走 split-K，长上下文低并发收益更明确",
+      "summary": "10 月 13 日 08:37 合并的 #56148 将 Triton split-K 扩至满足形状门控的短多 query 批次，并加固空 segment 和 graph padding。作者 B300、MiniMax-M3-NVFP4+EAGLE3、TP1、205k 输入/并发 1 的三次交错实验报告吞吐 1.642 倍、TPOT 15.29→7.24ms。",
+      "judgment": "适用 max_seqlen_q≤8 等条件，并增加 speculative scratch。高并发收益明显缩小，部分旧实验存在回归且未在最终版本重测；不能推广至所有 GPU、attention backend 或生产负载。",
+      "sources": [
+        {
+          "name": "vLLM #56148",
+          "url": "https://github.com/vllm-project/vllm/pull/56148"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "SGLang #40223 于 10 月 12 日 15:38 合并，为 Inkling 的 HiCache 恢复补齐 MTP draft KV/recurrent state、多 head 范围及 SWA 索引处理；项目验证使用 synthetic weights、关闭 CUDA graphs，未覆盖外部 L3。本轮检查 SMG 近期 PR、合并、Release 与 Issue：最新 Release 仍为 10 月 9 日发布的 v1.12.0；Nemotron-H Omni #3323 尚开放，统一 gRPC deadline #3319 仍为 draft，不能列作已交付能力。",
+    "judgment": "缓存恢复应校验所有参与后续推测计算的状态，而非仅 target KV。用真实权重、CUDA graphs 和实际 L3 后端追加冷暖一致性测试；版本部署清单应以具体 commit 或后续 Release 为准。",
+    "sources": [
+      {
+        "name": "SGLang #40223",
+        "url": "https://github.com/sgl-project/sglang/pull/40223"
+      },
+      {
+        "name": "SMG v1.12.0",
+        "url": "https://github.com/smg-project/smg/releases/tag/v1.12.0"
+      },
+      {
+        "name": "SMG #3323",
+        "url": "https://github.com/smg-project/smg/pull/3323"
+      },
+      {
+        "name": "SMG #3319",
+        "url": "https://github.com/smg-project/smg/pull/3319"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Rust 基础设施团队 10 月 12 日总结：crates.io/docs.rs 部署 WAF 与 DDoS 防护，7 个 crate 转向 trusted publishing，并为 GitHub Actions 增加审计；Q4 计划将部署从个人笔记本转向受控集中环境。文中 CDN 请求计算时间约降 10%，不是下载速度提升 10%。本轮所查 Go 与 Kubernetes 官方博客在近 48 小时未见新文，此结论不覆盖其全部仓库活动。",
+    "judgment": "可借鉴发布身份、工作流审计和集中部署的组合，而不是仅增加扫描工具。Rust 这篇属于基础设施实践，不是语言版本更新；尚在规划的部署变更不要写成已经完成。",
+    "sources": [
+      {
+        "name": "Rust 基础设施 Q3 总结与 Q4 计划",
+        "url": "https://blog.rust-lang.org/inside-rust/2026/10/12/infrastructure-team-q3-recap-and-q4-plan/"
+      },
+      {
+        "name": "Go 官方博客",
+        "url": "https://go.dev/blog/"
+      },
+      {
+        "name": "Kubernetes 官方博客",
+        "url": "https://kubernetes.io/blog/"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "Mooncake：默认 wheel 构建纳入 EFA，减少镜像分叉",
+      "summary": "10 月 12 日 16:23 合并的 #4356 为默认 CUDA/CUDA13/non-CUDA、x86_64/arm64 wheel 构建启用 EFA，接续运行时 libfabric 加载和传输选择。目标是同一包支持 EFA 与 IB/RoCE，避免切换专用 EFA 包时失去 EP/PG。",
+      "judgment": "这是构建链整合，尚不能据此认定已发布包可直接替换。落地时检查具体 wheel、运行时 libfabric、网卡选择和互操作；不要把包统一解释成网络吞吐提升。",
+      "sources": [
+        {
+          "name": "Mooncake #4356",
+          "url": "https://github.com/kvcache-ai/Mooncake/pull/4356"
+        }
+      ]
+    },
+    {
+      "title": "SMG：SSE 静默保活适合长 Prefill，但不是首 token",
+      "summary": "10 月 12 日 22:27 合并的 #3241 在引擎静默时默认每 15 秒发送 SSE 保活，OpenAI 形状端点使用 comment，Messages 使用 ping event；--sse-keepalive-secs 0 可关闭，保活不插入未完成帧内部。",
+      "judgment": "应与入口代理的 idle timeout 和客户端解析器联合验收。监控不要把 comment/ping 当 TTFT，也不要用保活掩盖真正的推理超时；业务 deadline 仍需单独执行。",
+      "sources": [
+        {
+          "name": "SMG #3241",
+          "url": "https://github.com/smg-project/smg/pull/3241"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "Microsoft 10 月 12 日宣布扩大 Azure Maia 部署：Maia 200 已承载 Copilot 等生产负载；公司计划从 2027 年起扩展至多 GW，并披露 Maia 300 的内存带宽和机架路线。公告中的相对 tokens/功耗优势属于公司主张或预测，不是本报独立验证，也不代表客户现在就可采购全部新系统。",
+    "judgment": "行业信号是推理竞争同时落在内存带宽、数据移动、KV 管理与系统能效。做容量规划应以可获取的产品、实测负载和完整机架约束为依据，不从路线图直接推导投资回报。",
+    "sources": [
+      {
+        "name": "Microsoft Maia 扩展公告",
+        "url": "https://blogs.microsoft.com/blog/2026/10/12/microsoft-to-expand-azure-maia-system-to-multi-gigawatt-deployments/"
+      }
+    ]
+  },
+  "actions": [
+    "审查历史存储的租户身份与 migration 4，单独制定旧共享记录的处置方案。",
+    "对 P/D 的 cached_tokens 做冷暖、流式/非流式及连续用量回归，校正每租户报表。",
+    "在两 worker 小池中同时对比轮询与缓存亲和的 TTFT、吞吐和瞬时负载差。",
+    "对 split-K 和 MTP 缓存恢复按真实模型、graph、并发及显存余量验收。",
+    "把 SSE 保活、首 token 与业务 deadline 分开计量，并验证代理和客户端行为。"
+  ]
+}
