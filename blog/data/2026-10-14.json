@@ -1,0 +1,140 @@
+{
+  "date": "2026-10-14",
+  "title": "取消风暴要隔离连接，KV 配对与缓存等待回到真实语义",
+  "deck": "截至 2026-10-14 08:58（Asia/Shanghai）：SMG 修正取消流与共享存储配对，SGLang 细化 HiCache 等待观测，Mooncake 限制日志风暴。主干合并不等于稳定版已包含；测试数字与故障现象来自项目记录，未由本报独立复现。文内合并时刻均为北京时间。",
+  "top_items": [
+    {
+      "title": "SMG：取消流先 abort 再 drain，避免把 HTTP/2 故障误判为限流",
+      "summary": "10 月 13 日 20:10 合并的 #3360 对废弃流先发送 abort，再最多等待 30 秒让 worker 结束，减少迟到帧耗尽 h2 reset 限额并触发整连接 GOAWAY。传输故障统一归为可重试的 502 backend_error，并计入 breaker，不再把相关 RESOURCE_EXHAUSTED 当作真实 429。",
+      "judgment": "取消不是单请求的小事，它可能牵连共享连接。应压测大量 abort、PD 停滞和健康流共存；超时后仍会 reset，drain 也占用流与任务，且 PR 尚缺合并后真实 PD 部署复测，不能宣称彻底消除 GOAWAY。",
+      "sources": [
+        {
+          "name": "smg #3360",
+          "url": "https://github.com/smg-project/smg/pull/3360"
+        }
+      ]
+    },
+    {
+      "title": "SMG：共享 KV store 与 P2P 明确分型，配对成功不代表在线命中",
+      "summary": "10 月 14 日 02:09 合并的 #3378 将 MooncakeStoreConnector、SharedStorageConnector、FlexKV、HF3FS 归为 store profile，跳过 P2P bootstrap 与虚构 handoff 参数，并标记 mode=store。store/P2P 混配返回 503 no_compatible_pd_pair。",
+      "judgment": "主要覆盖 vLLM HTTP/gRPC；LMCache、offloading 仍按 unknown/passthrough。作者真实 MooncakeStore 实验虽 40/40 HTTP 200，实时 prefill→decode 却未命中 store，暴露异步写入和存储延迟问题。应分开验收配对语义、KV 到达时序与 TTFT。",
+      "sources": [
+        {
+          "name": "smg #3378",
+          "url": "https://github.com/smg-project/smg/pull/3378"
+        }
+      ]
+    },
+    {
+      "title": "SGLang：HiCache 等待终于可按请求观察，但两个时间不能相加",
+      "summary": "10 月 14 日 02:13 合并的 #43946 在 meta_info 增加 storage_prefetch_wait 与 storage_staging_wait，单位秒，记录请求被对应调度门阻塞的区间。仅启用 metrics 且不是 PD decode role 时记录；缺失字段与已测得零等待含义不同。",
+      "judgment": "两段可能重叠且包含轮询间隔，不能相加成存储耗时，更不是缓存对 TTFT 的因果贡献。本次只增加观测，不改变调度或缓存所有权；先区分缺失、未闭合和零值，再比较等待策略。",
+      "sources": [
+        {
+          "name": "sglang #43946",
+          "url": "https://github.com/sgl-project/sglang/pull/43946"
+        }
+      ]
+    },
+    {
+      "title": "Mooncake：日志风暴会饿死 CQ polling，故障诊断也要限流",
+      "summary": "10 月 13 日 10:31 合并的 #4492 针对地址查找失败时同步倾倒 segment 缓存的问题，改为进程级每 0.5 秒最多一次 dump body，常规模式仅输出失败 segment，完整 dump 留给 trace。原日志路径占用 RDMA completion 工作线程，令无关传输也超时。",
+      "judgment": "修复的是诊断路径的故障放大，不是底层地址失败。每次失败仍留一行日志；应把日志量、CQ 进度和超时相关联，避免将作者故障场景收益当作正常吞吐提升。",
+      "sources": [
+        {
+          "name": "Mooncake #4492",
+          "url": "https://github.com/kvcache-ai/Mooncake/pull/4492"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "本轮检查了 SMG 近期 PR、合并、Release 和 Issue，最新正式版仍为 v1.12.0。新 Issue #3363 报告 mesh 与 Kubernetes discovery 在多 router 滚动后反复恢复旧 worker URL，修复 #3375 尚未合并。昨日 draft #3319 已关闭且未合并，由仍为 draft 的 #3373 接替，不能视作统一 gRPC deadline 已交付。",
+    "judgment": "多副本网关应专门测试滚动升级后的旧地址清理、成员退出和超时，而非只看健康探针。将未合并的修复列入跟踪清单，部署版本仍以明确 commit/Release 为准。",
+    "sources": [
+      {
+        "name": "SMG Releases",
+        "url": "https://github.com/smg-project/smg/releases"
+      },
+      {
+        "name": "SMG Issue #3363",
+        "url": "https://github.com/smg-project/smg/issues/3363"
+      },
+      {
+        "name": "smg #3375",
+        "url": "https://github.com/smg-project/smg/pull/3375"
+      },
+      {
+        "name": "smg #3319",
+        "url": "https://github.com/smg-project/smg/pull/3319"
+      },
+      {
+        "name": "smg #3373",
+        "url": "https://github.com/smg-project/smg/pull/3373"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Rust Release team 10 月 13 日开放 1.99.1 预发布测试，计划 10 月 15 日正式发布；预发布说明涉及 UEFI/嵌入式 wcslen、x86_64 FFI bool 返回值及 macOS rust-lld 的 libLLVM rpath 修复。本轮检查的 Go 与 Kubernetes 官方博客未见近 48 小时新文，这不覆盖全部仓库与生态活动。",
+    "judgment": "涉及 FFI、嵌入式或 macOS 链接的 Rust 服务和工具可优先回归；预发布测试不应直接等同生产升级批准。Go/Kubernetes 今日不以旧公告凑数，网关在 Kubernetes 的滚动风险见工程段。",
+    "sources": [
+      {
+        "name": "Rust 1.99.1 预发布测试",
+        "url": "https://blog.rust-lang.org/inside-rust/2026/10/13/1.99.1-prerelease/"
+      },
+      {
+        "name": "Rust 预发布说明",
+        "url": "https://dev-doc.rust-lang.org/1.99.1/releases.html"
+      },
+      {
+        "name": "Go 官方博客",
+        "url": "https://go.dev/blog/all"
+      },
+      {
+        "name": "Kubernetes 官方博客",
+        "url": "https://kubernetes.io/blog/"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "SMG Nemotron Omni：昨日待合并的多模态适配进入主干",
+      "summary": "#3323 于 10 月 13 日 21:13 合并，为 TokenSpeed 接入 Nemotron-3-Nano-Omni 图像、音频、视频预处理及 prompt 展开；视频最多抽 32 帧，音频按 30 秒分块并拒绝超过 600 秒输入。",
+      "judgment": "这是指定 checkpoint 家族的 TokenSpeed tensor layout，不能推广为 vLLM/SGLang 通用 Omni 支持。用实际模型和混合 worker 配置验收预处理、token 计数与拒绝行为。",
+      "sources": [
+        {
+          "name": "smg #3323",
+          "url": "https://github.com/smg-project/smg/pull/3323"
+        }
+      ]
+    },
+    {
+      "title": "vLLM GLM 工具参数解析：别让长 JSON 拖住 API event loop",
+      "summary": "10 月 13 日 05:28 合并的 #61253 为 glm47_moe 接入可选 arg_value_extender，避免每个 chunk 重做累计参数。作者 CPU 直接解析器测试中，100KB 参数的每 chunk 开销约由 6.4ms 降至 7μs。",
+      "judgment": "测试不是 GPU 服务端到端吞吐，其他 parser 也不会自动获益。可借鉴按增量处理的设计，同时回归逐 chunk DeltaMessage 等价性与长工具调用下的并发尾延迟。",
+      "sources": [
+        {
+          "name": "vllm #61253",
+          "url": "https://github.com/vllm-project/vllm/pull/61253"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "NVIDIA 与 Cisco 10 月 12 日公告提出 USFP 可插拔光模块方案，面向每通道 400Gb/s 信号，并与 TE Connectivity、Amphenol 建立多供应商生态。公告宣称目标总体容量可达 12.8Tb/s、相对 200Gb/s-per-lane 模块约四倍带宽密度及 1.3 倍能效；这些是厂商路线图主张，非本报实测。",
+    "judgment": "推理集群扩展的产业竞争继续延伸到交换机面板密度、互连功耗和网络层级。应跟踪开放规范、配套设备与实际供货，不能从计划指标直接推导现有 RDMA 集群收益或投资回报。公告仅标日期，未据此断言精确发布时间落在 48 小时内。",
+    "sources": [
+      {
+        "name": "NVIDIA / Cisco USFP 公告",
+        "url": "https://nvidianews.nvidia.com/news/nvidia-and-cisco-introduce-new-pluggable-optics-form-factor-to-scale-ai-factories"
+      }
+    ]
+  },
+  "actions": [
+    "用取消密集与 PD 停滞负载回归共享 HTTP/2 连接，分别监控 429、502、GOAWAY 与 drain 资源。",
+    "对共享 KV store 同时验收传输类型配对、写入完成时序、实际命中和 TTFT，避免以 HTTP 200 代替命中证明。",
+    "HiCache 报表区分缺失与零等待，不相加 prefetch/staging 时间。",
+    "在多 router Kubernetes 滚动测试中追踪旧 worker URL，未合并修复不要当作稳定版能力。",
+    "对 Rust 1.99.1 预发布做 FFI 与链接回归；长工具参数测试同时观察 API event loop 和尾延迟。"
+  ]
+}
