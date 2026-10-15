@@ -1,0 +1,128 @@
+{
+  "date": "2026-10-15",
+  "title": "流隔离继续收紧，KV 可见性与内存生命周期成为验收重点",
+  "deck": "截至 2026-10-15 09:00（Asia/Shanghai）：SMG 补齐停滞流隔离、滚动后旧地址清理和 attention-DP 缓存事件订阅；vLLM 新问题提示 KV 传输必须校验内存生命周期与拓扑兼容。主干合并不代表稳定版已包含，项目测试与问题报告均未由本报独立复现。文内时间均为北京时间。",
+  "top_items": [
+    {
+      "title": "SMG：从取消流修复走向停滞流隔离",
+      "summary": "#3465 于 10 月 15 日 05:08 合并，将每条 gRPC 流接收窗口从 16 MiB 缩至 256 KiB，连接窗口增至 512 MiB，避免单条不读取的小帧流耗尽 h2 共享预算、以 GOAWAY 拖垮同连接其他 RPC。项目回归测试 16/16 通过。",
+      "judgment": "这是昨日取消流 reset 修复之外的新进展。应同时压测正常流与慢消费者；多个停滞流的聚合保护仍是后续工作，不能据此宣布所有连接级故障已消除。",
+      "sources": [
+        {
+          "name": "SMG #3465",
+          "url": "https://github.com/smg-project/smg/pull/3465"
+        }
+      ]
+    },
+    {
+      "title": "SMG：昨日待合并的幽灵 worker 修复进入主干",
+      "summary": "#3375 于 10 月 14 日 09:27 合并，阻止已死亡 router owner 的记录重新引入旧 worker，并抑制本地已删除的端点实例。三网关 mock 测试中，七分钟内访问退役地址从 34 次降为零；关联 Issue #3363 已关闭。",
+      "judgment": "多 router 的 Kubernetes 滚动升级应验收成员退出与旧地址清理。混合版本记录仍兼容，未知 owner 不会直接被判死；mock 结果不能替代真实服务发现与网络分区回归。",
+      "sources": [
+        {
+          "name": "SMG #3375",
+          "url": "https://github.com/smg-project/smg/pull/3375"
+        },
+        {
+          "name": "SMG Issue #3363",
+          "url": "https://github.com/smg-project/smg/issues/3363"
+        }
+      ]
+    },
+    {
+      "title": "SMG：attention-DP 的 KV 事件不能只订阅 rank 0",
+      "summary": "#3434 于 10 月 14 日 10:55 合并，按解析后的调度拓扑 dp_size × attn_dp_size 计算 KV-event 发布端数量，修正较新 SGLang attention-DP 部署此前只覆盖 rank 0 的情况。八 rank 单元测试由一个订阅修正为八个。",
+      "judgment": "缓存感知路由先要有完整的可见性。真实较新引擎版本验证仍待补齐；应逐 rank 核对事件到达、缓存状态与路由命中，不把订阅数正确当成性能收益证明。",
+      "sources": [
+        {
+          "name": "SMG #3434",
+          "url": "https://github.com/smg-project/smg/pull/3434"
+        }
+      ]
+    },
+    {
+      "title": "vLLM：取消超时不等于远端写入已经停止",
+      "summary": "10 月 14 日 Issue #61532 报告 P2P KV offload 在 AbortAck 迟到、丢失或带未完成 load 关闭 session 时，目的缓冲区生命周期可能与远端写入脱节。证据来自源码检查及 NIXL 1.4.1 CPU 内存、UCX-over-TCP 探针，尚无 RDMA 硬件或端到端 KV 损坏复现。",
+      "judgment": "这是待验证的正确性风险，不是已证实普遍发生的数据损坏。取消、超时、关闭与槽位复用必须形成可证明的所有权协议；仅加大超时不能代替协议保证。",
+      "sources": [
+        {
+          "name": "vLLM Issue #61532",
+          "url": "https://github.com/vllm-project/vllm/issues/61532"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "vLLM 10 月 14 日 Issue #61526 给出 Granite-4.0-H Micro、NixlConnector、单节点异构 TP 的复现：Mamba2 group 为复制而非均匀分片时，TP2→TP1 与 TP1→TP2 都报告错误输出，同 TP 与参考一致。文档本已要求 Mamba 使用同构 TP，但握手未拒绝该组合。SMG 本轮已检查近期合并、PR、Release 与重要 Issue，最新正式版仍为 10 月 9 日发布的 v1.12.0；上述新增能力应按明确 commit 评估。",
+    "judgment": "传输成功和握手成功都不能代替数值正确性。先对不支持的 TP/状态布局组合快速拒绝，再用固定输入比对输出；不要把未支持组合的报告扩大成所有 NIXL 部署均受影响。",
+    "sources": [
+      {
+        "name": "vLLM Issue #61526",
+        "url": "https://github.com/vllm-project/vllm/issues/61526"
+      },
+      {
+        "name": "SMG v1.12.0",
+        "url": "https://github.com/smg-project/smg/releases/tag/v1.12.0"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Go 10 月 13 日回移植请求 #82190 将 CL 847406 列为 Go1.27.3 候选，处理大量 goroutine 阻塞同一 sync.Mutex 时栈收缩呈二次复杂度、GC CPU 过高的回归；请求称 Go 1.26 也受影响。Kubernetes 10 月 14 日 #143026 报告在 384 逻辑 CPU、1.33.13、cgroup v2 节点上，256 与 288 CPU request 均映射到 cpu.weight=10000。Rust 本轮未找到足够核实的新进展，不重复昨日预发布消息。",
+    "judgment": "Go 项目是待回移植，不能写成已发布修复。Kubernetes 报告针对争用下权重公平性，并非最多只能运行 256 CPU；后续版本影响尚未独立核实。大 CPU 推理节点应读取实际 cgroup 权重，Go 服务则检查锁争用处阻塞 goroutine 的集中程度。",
+    "sources": [
+      {
+        "name": "Go 回移植请求 #82190",
+        "url": "https://github.com/golang/go/issues/82190"
+      },
+      {
+        "name": "Go CL 847406",
+        "url": "https://go.dev/cl/847406"
+      },
+      {
+        "name": "Kubernetes Issue #143026",
+        "url": "https://github.com/kubernetes/kubernetes/issues/143026"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "SMG 多模态 tensor：减少复制先看网关 CPU",
+      "summary": "#3429 于 10 月 14 日 09:26 合并，重试 clone 共享 tensor payload、符合条件的单图输入复用现有 buffer，并一次预留 gRPC 编码容量。作者同机 mock-worker 测试 CPU/image 从 16.52 降至 14.66 ms，约下降 11.2%；饱和吞吐从 1217 到 1264 req/s。",
+      "judgment": "这些是网关 CPU 与 mock backend 结果，不是模型推理提速。评估时固定图像尺寸、重试率和并发，同时确认共享 payload 生命周期与异常路径安全。",
+      "sources": [
+        {
+          "name": "SMG #3429",
+          "url": "https://github.com/smg-project/smg/pull/3429"
+        }
+      ]
+    },
+    {
+      "title": "SGLang DCP prefill 原型：性能结果必须和正确性门槛一起读",
+      "summary": "10 月 14 日 draft #44341 为 DSA extend 提供默认关闭的 striped latent prefix KV 聚合路径。作者在 4×B300、GLM-5.3 NVFP4 上报告 DCP4、32k prompt prefill 从 15.2k 到 22.3k tokens/s；但一次 prefill-hit KL 样本为 0.0235，高于 0.02 门槛，完整正确性复验仍待完成。",
+      "judgment": "适合作为通信瓶颈研究材料，尚不应推荐生产启用。缓存命中负载要同时检查通信、数值误差和完整回归结果，不能只摘录吞吐提升。",
+      "sources": [
+        {
+          "name": "SGLang draft #44341",
+          "url": "https://github.com/sgl-project/sglang/pull/44341"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "NVIDIA 10 月 14 日宣布 cuPotential，用于 GPU 加速原子相互作用模拟，Synopsys 为早期采用者之一。公告称早期访问测试相对已做 GPU 优化的工作流再加速 2–3 倍，并介绍半导体设计与制造厂商采用 CUDA-X 的进展。",
+    "judgment": "产业信号是 AI 工作流与专用仿真库进一步结合，软件生态和领域验证的重要性上升。2–3 倍属于厂商特定负载主张，不能外推为通用推理收益或投资回报；实际价值需结合可获得性、准确性与客户工作流验证。",
+    "sources": [
+      {
+        "name": "NVIDIA cuPotential 与半导体生态公告",
+        "url": "https://nvidianews.nvidia.com/news/nvidia-and-semiconductor-leaders-advance-ai-across-chip-design-and-manufacturing-for-ai-defined-labs"
+      }
+    ]
+  },
+  "actions": [
+    "回归共享 gRPC 连接中的单个慢消费者与多个停滞流，观察正常请求尾延迟、窗口占用和 GOAWAY。",
+    "对多 router Kubernetes 滚动升级记录退役端点访问次数，并测试成员退出、重启与混合版本。",
+    "在 attention-DP 部署逐 rank 核验 KV 事件与路由缓存状态，暂不以单元测试推断真实命中提升。",
+    "为 KV 传输增加取消后写入、session 关闭、槽位复用及不兼容 TP 的正确性测试。",
+    "对大 CPU 节点检查 cpu.weight；Go GC 高 CPU 排查结合锁争用与阻塞 goroutine 分布，等待明确修复版本。"
+  ]
+}
