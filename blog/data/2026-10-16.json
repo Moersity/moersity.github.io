@@ -1,0 +1,132 @@
+{
+  "date": "2026-10-16",
+  "title": "结构化输出设预算，调度优先级与 KV 布局守住边界",
+  "deck": "截至 2026-10-16 09:00（Asia/Shanghai）：SMG 为工具 grammar 增加预算并转发引擎优先级头；Mooncake 与 vLLM 的新修复强调文件隔离和量化 KV 布局正确性。SMG v1.13.0 当前为预发布，部分新合并晚于该版本。文内时间均为北京时间，项目测试未由本报独立复现。",
+  "top_items": [
+    {
+      "title": "SMG：工具 grammar 有了元素预算，应用校验不能省",
+      "summary": "#3512、#3515 于 10 月 16 日 07:33 合并，为 legacy MiniMax forced-call 与 Symphony XML grammar 设置每工具 1,024 元素预算，超出部分退化为自由文本，以限制宽深 schema 展开开销。该预算不是字节上限，也不是整请求总上限；Symphony 的真实引擎验证仍待完成。",
+      "judgment": "这是稳定性改进，同时改变了约束覆盖范围。多个工具的累计开销与超长叶子值仍应单独限制；工具执行前必须做完整 schema 校验，不能把 grammar fallback 当成输入已验证。",
+      "sources": [
+        {
+          "name": "smg #3512",
+          "url": "https://github.com/smg-project/smg/pull/3512"
+        },
+        {
+          "name": "smg #3515",
+          "url": "https://github.com/smg-project/smg/pull/3515"
+        }
+      ]
+    },
+    {
+      "title": "SMG：优先级头可穿透 HTTP/PD，入口必须控制谁能覆盖",
+      "summary": "#3510 于 10 月 16 日 07:34 合并，将 x-override-priority 加入转发白名单，覆盖 HTTP 流式/非流式以及 PD 两端与重试。引擎须开启 SGLANG_ENABLE_REQUEST_HEADER_OVERRIDES，且该头优先于 body priority；未增加每租户上限，也不覆盖 gRPC priority 字段。",
+      "judgment": "面向不可信客户端时，应在入口剥离或重写该头，再映射租户权限。它与 SMG 的 X-SMG-Priority 分类不是同一机制；仅在 body 写入优先级不足以防止客户端覆盖。",
+      "sources": [
+        {
+          "name": "smg #3510",
+          "url": "https://github.com/smg-project/smg/pull/3510"
+        }
+      ]
+    },
+    {
+      "title": "Mooncake：I/O 返回成功，也可能命中了错误文件",
+      "summary": "#4648 于 10 月 15 日 15:14 合并，修复 io_uring 路径函数级静态线程缓存跨 transport 复用文件上下文的问题：两个 owner 对不同文件使用同一 segment ID 时，可能拿到另一实例的文件描述符。改为实例级 ThreadLocalStorage；作者真实 io_uring、tmpfs buffered I/O 的 15 项测试通过。",
+      "judgment": "多 engine 同进程、卸载重建与 ID 复用回归应比较实际读写字节，不能只检查 completion 状态。测试不代表 RDMA、GPU、GDS 或物理磁盘 O_DIRECT 已验证，也没有证明性能提升。",
+      "sources": [
+        {
+          "name": "Mooncake #4648",
+          "url": "https://github.com/kvcache-ai/Mooncake/pull/4648"
+        }
+      ]
+    },
+    {
+      "title": "vLLM：不兼容的 NVFP4 KV 异构 TP 在握手阶段拒绝",
+      "summary": "#61865 于 10 月 16 日 04:57 合并。NVFP4 页内数据与 scales 分离，现有 NIXL 连续 head 切片方式不适用于部分异构 TP 重分片；当每 rank 实际 KV head 数不同且使用 NVFP4 时，新检查直接报错。相同每 rank head 数、复制头和 MLA 路径不受该拒绝规则影响。",
+      "judgment": "这是昨日 Mamba2 问题之外的新布局边界。部署矩阵要同时标注量化格式、head 布局和 TP 配比；拒绝不支持组合比静默错误输出更安全，但不能解释成全部异构 TP 已获支持。",
+      "sources": [
+        {
+          "name": "vllm #61865",
+          "url": "https://github.com/vllm-project/vllm/pull/61865"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "SGLang #44453 于 10 月 16 日 01:46 合并，针对非 speculative CUDA PP 的多 microbatch NCCL 等待环，按 rank 奇偶调整 send/recv 顺序。事故来自两节点 PP2 PD-prefill，上游验证为单节点 2×B300 强制 NET/IB loopback，真实跨节点和 PP>2 尚未测试。SMG #3516 同日 07:34 合并，在 TLS 握手前设置 TCP_NODELAY；没有给出 HTTPS 同负载前后实测。",
+    "judgment": "流水线并行要覆盖不同到达时间、prompt 长度和多个在途 microbatch。网关 TTFT 则分开测写出、网络送达与模型计算；不要将 loopback 通过等同多节点验证，也不要承诺 TLS 固定减少 40 ms。",
+    "sources": [
+      {
+        "name": "sglang #44453",
+        "url": "https://github.com/sgl-project/sglang/pull/44453"
+      },
+      {
+        "name": "smg #3516",
+        "url": "https://github.com/smg-project/smg/pull/3516"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Rust 官方于 10 月 15 日发布 1.99.1，修复 x86_64 FFI bool 返回值误编译、UEFI/embedded 的 wcslen 符号及 macOS rust-lld 的 libLLVM rpath。Kubernetes #142760 于 10 月 16 日 08:32 合并，新增分片 list/watch 与 informer 客户端 helper，归属 v1.38 milestone，尚非稳定版能力。Go/pkgsite 当日新 Issue #82250 讨论在缓存 TTL 已缩短后，是否仍应为 module fetch 扫描 Redis keyspace 做主动前缀失效，尚未形成发布修复。",
+    "judgment": "Rust 推理网关含 C/C++ FFI 时优先回归 ABI 边界并固定工具链。分片 informer 要验收重分片、fallback 与事件完整性。缓存 TTL 改变后应重算失效成本，但 pkgsite 可容忍页面陈旧的取舍不能外推到强一致业务。",
+    "sources": [
+      {
+        "name": "Rust 官方 release notes",
+        "url": "https://doc.rust-lang.org/releases.html"
+      },
+      {
+        "name": "kubernetes #142760",
+        "url": "https://github.com/kubernetes/kubernetes/pull/142760"
+      },
+      {
+        "name": "Go/pkgsite Issue #82250",
+        "url": "https://github.com/golang/go/issues/82250"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "SMG v1.13.0：按预发布及具体 commit 评估",
+      "summary": "v1.13.0 于 10 月 16 日 03:04 发布，GitHub 标记 prerelease=true，最新正式版仍为 v1.12.0。此次已检查近期合并、开放 PR、Release 与重要 Issue；本文 grammar 预算、优先级头和 TLS 改动均晚于 v1.13.0 tag。新 Issue #3496 报告注册探针仍访问 /health，可能与仅暴露 /healthz 的 HTTP backend 不兼容，尚待核实。",
+      "judgment": "不要把主干修复写成预发布包已包含，也不要将 202 Accepted 当成 worker ready。注册探针问题的版本标记存在疑点，应以实际 commit、探针路径及最终注册状态复核。",
+      "sources": [
+        {
+          "name": "SMG v1.13.0 预发布",
+          "url": "https://github.com/smg-project/smg/releases/tag/v1.13.0"
+        },
+        {
+          "name": "SMG Issue #3496",
+          "url": "https://github.com/smg-project/smg/issues/3496"
+        }
+      ]
+    },
+    {
+      "title": "Mooncake S3 兼容 offload：先读超时重试语义",
+      "summary": "#4494 于 10 月 15 日 19:52 合并，新增采用 SigV4 的 S3 文件适配器，支持 path-style 与 virtual-hosted 地址。已发出请求后的超时不自动重试，避免不确定 PUT 结果引发重叠写；作者提供 SeaweedFS、MinIO、AWS S3 的分页与字节一致性测试。",
+      "judgment": "适合作为冷 KV 存储选择研究，不能据此认定对象存储适合 decode 热路径。容量之外，应测恢复流量、访问延迟以及写入结果不确定时的业务处理。",
+      "sources": [
+        {
+          "name": "Mooncake #4494",
+          "url": "https://github.com/kvcache-ai/Mooncake/pull/4494"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "NVIDIA 10 月 15 日公告扩大与 Adobe 合作：Frame.io 工作流采用 NVDEC、TensorRT、CUDA 加速视频解码、预处理和 embedding；Brand Concierge 的 Nemotron 优化版计划于今年稍后向企业客户提供。公告的性能主张针对早期选定工作负载，并非全部产品已普遍可用。",
+    "judgment": "产业信号是 GPU 推理价值更多进入具体多模态业务管线，验收指标应包括素材进入后多久可搜索、尾延迟及质量。厂商合作与选定负载结果不能直接推出通用 LLM 推理收益或投资回报。",
+    "sources": [
+      {
+        "name": "NVIDIA 与 Adobe 合作公告",
+        "url": "https://nvidianews.nvidia.com/news/adobe-and-nvidia-expand-collaboration-to-speed-agentic-creation"
+      }
+    ]
+  },
+  "actions": [
+    "为宽深工具 schema、多个工具和超长叶子值分别压测 grammar 构建开销；对自由文本 fallback 的结果做应用层完整校验。",
+    "核查入口是否允许不可信 x-override-priority；覆盖 HTTP、PD 两端和重试，确认租户权限与引擎开关一致。",
+    "为多 transport 同 segment ID、实例重建和错误文件读写增加字节级断言；量化 KV 则覆盖每种 TP/head 布局组合。",
+    "在真实多节点 PP2 和更高 PP 配置回归多 microbatch 收发；TLS TTFT 优化必须通过同负载前后测量验证。",
+    "升级 Rust 1.99.1 前回归 FFI；评估 SMG 时固定版本和 commit，区分 v1.13.0 预发布与其后主干修复。"
+  ]
+}
