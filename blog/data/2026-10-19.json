@@ -1,0 +1,140 @@
+{
+  "date": "2026-10-19",
+  "title": "网关密钥守住边界，多 rank 缓存与负载必须完整可见",
+  "deck": "截至 2026-10-19 09:00（Asia/Shanghai）：SMG 隔离网关与上游凭据，补齐 attention-DP 事件和静默 rank 负载；推理栈继续修复长上下文、异步事件与双向握手的边界问题。文内 PR 时间均为北京时间；合并不等于正式版本已包含，作者测试未由本报独立复现。",
+  "top_items": [
+    {
+      "title": "SMG：认证成功后不再把网关密钥送给上游",
+      "summary": "#3918 于 10 月 19 日 02:00 合并。启用 gateway/tenant API key 时，原先调用者 Authorization 优先的逻辑会把网关密钥转发给 provider 或 worker，盖过已配置上游密钥。现在认证命中后清除该凭据，同一密钥若重复出现在 x-api-key / x-goog-api-key 也会移除；PD 与 Anthropic 路径补齐配置密钥使用。关闭网关认证时的 provider key 透传保持不变。",
+      "judgment": "升级前逐个核验 worker 的 api_key：曾直接接受网关密钥、但未配置自身凭据的 worker，升级后可能收到无凭据请求。覆盖 HTTP、PD 与 Anthropic；公开 GET proxy 不在此认证中间件内，不能概括为所有路由统一隔离。",
+      "sources": [
+        {
+          "name": "smg #3918",
+          "url": "https://github.com/smg-project/smg/pull/3918"
+        }
+      ]
+    },
+    {
+      "title": "SMG：缓存事件覆盖每个 attention-DP rank，序列也按 rank 独立",
+      "summary": "#3941 于 10 月 19 日 04:45 合并。Python TokenSpeed 与三种 Rust servicer 的共享 relay 从只订阅 rank 0 改为按 rank 订阅，并维护各自窗口和游标；Python relay 不再混用全局编号，避免交错事件被误判成缺口。作者真实双 rank 实验中，wide workload 在 480 秒内的 182 次 OUT_OF_RANGE/索引清空，在修复后降为零。",
+      "judgment": "这是路由观测完整性修复，不等于引擎自身命中率提高。应逐 rank 比对缓存事件、网关索引与 resync 日志；请求仍只有一个 cursor，多 rank 重连采取完整 resync，不能说已经支持各 rank 增量恢复。",
+      "sources": [
+        {
+          "name": "smg #3941",
+          "url": "https://github.com/smg-project/smg/pull/3941"
+        }
+      ]
+    },
+    {
+      "title": "SMG：静默 rank 的回退轮询不能被其他 rank 心跳回滚",
+      "summary": "#3968 于 10 月 19 日 08:49 合并。某 rank 停止 KV 事件后，GetLoads 新值曾被其他 rank 心跳携带的旧 pushed record 覆盖。修复将轮询结果合入对应记录；若轮询期间已收到该 rank 新推送，则保留更新的流记录。Python vLLM GetLoads 同时从仅返回首 rank 改为返回所服务各 rank 的快照。",
+      "judgment": "负载接口短暂更新不代表调度持续使用新值。验收应交错静默 rank、活跃 rank 心跳与恢复事件，同时核对 gauge、共享快照和策略输入。作者 loopback/单测已覆盖，真实 attention-DP=2 引擎复测仍欠，不能当作生产恢复 SLA。",
+      "sources": [
+        {
+          "name": "smg #3968",
+          "url": "https://github.com/smg-project/smg/pull/3968"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "SGLang #44305 于 10 月 18 日 20:35 合并：大 ZMQ KV 事件批次耗尽 Tokio cooperative budget，可能引发忙旋与索引积压；接收批次改用 unconstrained。作者单 bridge/indexer 的约 40 MB、54,000 events 测试，从 600 秒仍未完成变为 0.22 秒。Mooncake #4704 于当日 16:56 合并：EFA 两端同时建连时，持状态锁发 RPC 与被动处理等锁形成互锁；修复释放 RPC 期间状态锁，并用 generation 拒绝陈旧回复。vLLM #61938 于 10 月 19 日 08:39 合并，将 Triton MLA 偏移升为 int64，同时把 logits workspace 纳入 profiling，解决特定 MI355 长上下文场景的溢出与显存高估。",
+    "judgment": "三者分别约束事件循环活性、连接状态机和显存账本，不能合并成一个吞吐提升数字。用大事件批次、双向同时拨号/中途断连，以及最大上下文×batch×split 的组合测试验收。Mooncake 作者只做 fake-context 测试，尚无真实 EFA 集成验证，且本修复不涵盖 CXI。",
+    "sources": [
+      {
+        "name": "sglang #44305",
+        "url": "https://github.com/sgl-project/sglang/pull/44305"
+      },
+      {
+        "name": "Mooncake #4704",
+        "url": "https://github.com/kvcache-ai/Mooncake/pull/4704"
+      },
+      {
+        "name": "vllm #61938",
+        "url": "https://github.com/vllm-project/vllm/pull/61938"
+      }
+    ]
+  },
+  "backend": {
+    "content": "vLLM #61892 于 10 月 19 日 04:29 合并：Rust gRPC 的结构化输出统一选择 xgrammar，增加原生 choice 编译及共享 schema 校验，对不支持的关键字返回 INVALID_ARGUMENT，修复 structural_tag 经 guidance 导致的 INTERNAL 错误。Kubernetes #142684 于 10 月 17 日 17:14 合并，仍在本次 48 小时窗口：PodGroup 全集群抢占的候选名曾导致低优先级 nominated Pod 查询为空，修复后清理相关节点上的提名状态。已检查 Go/Rust 官方博客，没有选入新的窗口内重要发行公告；不把日常主干维护凑成升级建议。",
+    "judgment": "Rust gRPC 升级需要回归约束语义：此前依赖 guidance 的 multipleOf、uniqueItems 等 schema 可能直接被拒绝；Rust HTTP 的混合约束路径并未一并解决。Go/Kubernetes 调度验收还应检查抢占后的 nominated node 状态，不能只验证受害 Pod 选择。正式发行及镜像包含情况需另核对。",
+    "sources": [
+      {
+        "name": "vllm #61892",
+        "url": "https://github.com/vllm-project/vllm/pull/61892"
+      },
+      {
+        "name": "kubernetes #142684",
+        "url": "https://github.com/kubernetes/kubernetes/pull/142684"
+      },
+      {
+        "name": "Go 官方博客",
+        "url": "https://go.dev/blog/"
+      },
+      {
+        "name": "Rust 官方博客",
+        "url": "https://blog.rust-lang.org/"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "SGLang 混合架构草稿：共享池也要共享状态生命周期",
+      "summary": "#43326 于 10 月 18 日 20:39 合并，将统一内存池的 speculative draft 融合从全注意力扩展到 SWA 与 recurrent-state，按子池注册放置状态，并同步调整历史保留、锁、prefix match、备份与恢复边界。",
+      "judgment": "优先看容量与正确性设计，而不是挑一个最大加速倍数。作者历史组合栈中不同模型收益不一，不能把旧 revision 的组合性能归于这一个新提交。",
+      "sources": [
+        {
+          "name": "sglang #43326",
+          "url": "https://github.com/sgl-project/sglang/pull/43326"
+        }
+      ]
+    },
+    {
+      "title": "vLLM PP warmup：各 stage 必须执行同一轮数",
+      "summary": "#62129 于 10 月 18 日 14:51 合并。MRV2 speculative warmup 原先用 rejection sampler 存在与否决定额外 greedy pass，但只有最后一级 PP 有 sampler，导致其等待其他级未发送的激活；改用 speculative_config 判断。作者 TP2/PP2 的 JIT/CUDA graphs smoke test 完成 1,024 tokens。",
+      "judgment": "为每一级记录 warmup forward 轮次，并覆盖 speculative 开关。启动与生成成功不是准确率 benchmark，不应省略输出质量验收。",
+      "sources": [
+        {
+          "name": "vllm #62129",
+          "url": "https://github.com/vllm-project/vllm/pull/62129"
+        }
+      ]
+    },
+    {
+      "title": "SMG 发布与待合并边界：先核对交付，再看新提案",
+      "summary": "已检查近期 PR、合并、Release 与重要 Issue。最新 Release 仍为 v1.13.0（10 月 16 日 03:04），上述新合并晚于该版本。#3971 在 10 月 19 日 08:47 创建，拟补齐 Symphony 单 region 内多个 function block 的工具调用解析，核验时尚未合并；新 audit issue #3950 重述昨日已报道的 zip 告警，不重复当作新漏洞。",
+      "judgment": "多工具调用完整性值得观察，但提案和 CPU 回放不能写成生产修复已交付。以 tag commit、镜像实际依赖和真实回归结果决定升级。",
+      "sources": [
+        {
+          "name": "SMG v1.13.0",
+          "url": "https://github.com/smg-project/smg/releases/tag/v1.13.0"
+        },
+        {
+          "name": "smg #3971",
+          "url": "https://github.com/smg-project/smg/pull/3971"
+        },
+        {
+          "name": "SMG audit #3950",
+          "url": "https://github.com/smg-project/smg/issues/3950"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "Anthropic 10 月 18 日官方公告提出向全资 LLC 形式的 Public Benefit Fund 配置 5% 股份，仍须股东批准；估值每比基线增长 50%，董事会可酌情再增加 2%。公告未给具体发布时间，本报不推断时分。",
+    "judgment": "这是 AI 企业治理与收益分配的信号，不能当作已经拨付的现金、确定回报，或推理成本下降的证据。初始安排待批准，后续增配也不是自动触发；工程采购仍需独立评估服务价格、可用性与迁移成本。",
+    "sources": [
+      {
+        "name": "Anthropic 官方公告",
+        "url": "https://www.anthropic.com/news/public-benefit-fund"
+      }
+    ]
+  },
+  "actions": [
+    "升级网关前盘点每个 worker/provider 的独立凭据，在隔离测试环境验证认证后上游实际收到的 header，避免记录明文密钥。",
+    "为 attention-DP 建立逐 rank 的 KV 事件、序号、索引与负载断言，覆盖单 rank 静默、其他 rank 心跳及重连全量同步。",
+    "把大 KV 事件批次加入路由回归，同时观测 CPU、积压与亲和命中，避免把请求未报错误判为索引健康。",
+    "对 EFA 同时主动建连、握手中断连和 NIC 路径变化做故障注入；在真实硬件验证前保留回滚方案。",
+    "对长上下文 MLA 校验整数偏移和 workspace 记账，并为 Rust gRPC 约束关键字、PP speculative warmup 增加兼容测试。"
+  ]
+}
