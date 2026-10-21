@@ -1,0 +1,141 @@
+{
+  "date": "2026-10-21",
+  "title": "PD 路由修复落地：缓存亲和性、首轮积压与超时边界",
+  "deck": "截至 2026-10-21 09:00（Asia/Shanghai）。重点跟进 SMG 昨日待合并事项的新进展，并核验推理引擎正确性、Go 安全补丁与云原生内存治理。下述 PR 合并不代表已发布稳定版；作者测试与厂商性能数据均未在本文独立复现。",
+  "top_items": [
+    {
+      "title": "SMG：PD 缓存亲和性与首轮 backlog 修复已合并",
+      "summary": "昨日仍在评审的 #4014、#4015 已分别于 10-20 09:49、10-21 03:22 合并；后续 #4024 于 10-21 04:15 合并。未启用 --worker-overload-shed 时，cache_aware prefill 池不再先被绝对 overload veto 拆散，仍保留基于相对计数压力的 spill。新一轮 prompt 尚无回答时，prefill side 获得按 backlog 估算、每侧读取一次且最高 120 秒的等待窗口；运行中冻结与 decode 停滞的判定保持原时序。作者在 TokenSpeed 2P1D、并发 128 的长 prompt replay 中报告修复组合无 504，迁移比例降至约 0.6–0.7%，但这不是通用性能保证。",
+      "judgment": "这是昨日提案的实质落地，不是重复旧闻。上线前同时测试缓存命中、队列饱和、空闲后突发与真实冻结，避免只恢复吞吐却拉长故障隔离。",
+      "sources": [
+        {
+          "name": "SMG #4014",
+          "url": "https://github.com/smg-project/smg/pull/4014"
+        },
+        {
+          "name": "SMG #4015",
+          "url": "https://github.com/smg-project/smg/pull/4015"
+        },
+        {
+          "name": "SMG #4024",
+          "url": "https://github.com/smg-project/smg/pull/4024"
+        }
+      ]
+    },
+    {
+      "title": "SMG：HTTP 请求预算耗尽不再触发跨 worker 重放",
+      "summary": "#4064 于 10-21 07:09 合并：HTTP 普通路由、PD 及外部 provider 的请求自身超时返回终止重试的 504 call_upstream_timeout；连接失败与底层 I/O 超时仍可重试。#4060 于 06:11 合并，为网关自身 ZMQ 引擎连接补上从 dispatch 开始的请求超时，切断静默流并发送 abort、释放占用。两者的错误码与重试语义尚不完全统一：ZMQ collected answer 仍走 worker_stream_failed，其 PR 明确统一终止重试规则属于后续工作。",
+      "judgment": "不要把‘有 timeout’等同于端到端预算正确。应按 HTTP/ZMQ、首 token 前/后、流式/非流式分别验证最终延迟、尝试次数及引擎残留请求；不能声称所有传输已禁止超时重放。",
+      "sources": [
+        {
+          "name": "SMG #4064",
+          "url": "https://github.com/smg-project/smg/pull/4064"
+        },
+        {
+          "name": "SMG #4060",
+          "url": "https://github.com/smg-project/smg/pull/4060"
+        }
+      ]
+    },
+    {
+      "title": "vLLM：修复 symmetric collective 输出的存储别名",
+      "summary": "#58154 于 10-21 02:21 合并。generic symmetric ReduceScatter 与 single-tensor AllGather 原先返回持久 scratch，相同 shape/dtype 的后续 collective 可覆盖仍在使用的结果；修复改为 clone 独立存储，并增加多输出保留及 CUDA graph replay 测试。Batched AllGather 与已有 AllReduce 不变，每次受影响调用增加一份输出大小的 D2D copy 和结果分配。",
+      "judgment": "优先按正确性修复评估，而非吞吐优化。启用 symmetric memory 的多卡部署应比较连续 collective 输出、图重放与普通路径的一致性，再量化复制成本。",
+      "sources": [
+        {
+          "name": "vLLM #58154",
+          "url": "https://github.com/vllm-project/vllm/pull/58154"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "SGLang #37958 于 10-21 07:12 合并，默认开启符合条件的 prefill shared-read-done，让后一步共享表写入不必总等整个 forward；HiCache/LMCache、DeepSeek V4.1 等路径仍保留完整屏障，不能泛化为所有 prefill 加速。SMG #4062 于 06:11 合并，Rust SGLang servicer 只发送 SamplingParams 的 26 字段 API 前缀，并在 handshake 校验 positional layout，修复 SGLang 0.5.22 新增字段引起的错位；正文仍列真实 0.5.22 scheduler smoke 为待做。#4069 于 08:16 合并，将不支持的结构化输出约束提前拒绝扩展到 Rust SGLang/TokenSpeed servicer：已知禁用/不支持的 backend 返回 INVALID_ARGUMENT，而非引擎内 abort 后看似成功的空回答；未知 backend 不提前判断。",
+    "judgment": "优化必须携带适用矩阵；兼容性不能只看健康探针。把‘模型已启动、协议布局匹配、约束可执行、真实请求可完成’拆成不同验收项，尤其检查 Rust/Python 跨语言边界与 KV offload 配置。",
+    "sources": [
+      {
+        "name": "SGLang #37958",
+        "url": "https://github.com/sgl-project/sglang/pull/37958"
+      },
+      {
+        "name": "SMG #4062",
+        "url": "https://github.com/smg-project/smg/pull/4062"
+      },
+      {
+        "name": "SMG #4069",
+        "url": "https://github.com/smg-project/smg/pull/4069"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Go 官方发布记录注明 10-19 的 1.27.3 与 1.26.10 均含 crypto/x509 安全修复；Kubernetes #143201 于 10-20 12:01 合并，main 构建工具链跟进 1.27.3，但 kube-cross/go-runner 镜像更新当时仍待后续。Kubernetes #141299 于 10-21 06:29 合并，为 protobuf runtime.AllocatorPool 增加 beta、默认开启的 AllocatorPoolBufferCap：超过 256 KiB 的 buffer 使用后不回池，而交给 GC，并调整扩容公式为 max(n, 2*cap)。Rust 侧的实际工程变化见 SMG servicer 的布局握手与能力检查，而不拿旧版本发布填充。",
+    "judgment": "Go 升级要核对实际构建产物而非只改开发机版本。buffer cap 是池留存策略，不是对象大小限制；大对象控制面需同时观察 RSS 与 GC CPU，不预设固定内存降幅。上述 K8s main 合并不等于所有发行镜像已更新。",
+    "sources": [
+      {
+        "name": "Go release history",
+        "url": "https://go.dev/doc/devel/release#go1.27.3"
+      },
+      {
+        "name": "Go 1.26.10",
+        "url": "https://go.dev/doc/devel/release#go1.26.10"
+      },
+      {
+        "name": "Kubernetes #143201",
+        "url": "https://github.com/kubernetes/kubernetes/pull/143201"
+      },
+      {
+        "name": "Kubernetes #141299",
+        "url": "https://github.com/kubernetes/kubernetes/pull/141299"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "SMG Slurm discovery：把作业生命周期接入推理 worker 发现",
+      "summary": "#4013 于 10-21 01:47 合并，支持以 Slurm 运行作业及节点发现 regular/prefill/decode worker，要求 Slurm 23.11 起；命令失败保留上次有效快照，并在本地重新过滤集群、状态与用户等条件。CLI Kubernetes discovery 重试间隔也由 60 秒改为默认 30 秒，可配置；Pod watch 事件仍即时处理。",
+      "judgment": "适合已有 HPC/Slurm 资源池的推理部署；先验证 requeue 身份变化、共享节点端口冲突与 poll 失败行为，不把 Slurm 作业存在等同于引擎已就绪。",
+      "sources": [
+        {
+          "name": "SMG #4013",
+          "url": "https://github.com/smg-project/smg/pull/4013"
+        }
+      ]
+    },
+    {
+      "title": "SMG 控制 token 与兼容性：明确修复边界和 CI 缺口",
+      "summary": "#4072 于 10-21 07:57 合并，DeepSeek V3.2/V4/V4.1 自编码 renderer 将消息中输入的控制 token 拼写作为普通文本编码；Jinja renderer 不在本次覆盖内。另已检查近期 Issue：#4045 记录 10-20 MI300X 上 Qwen3.8-27B BFCL 超时，不能据此声称质量验证通过。检查 Release 后最新仍为 10-16 北京时间发布的 v1.13.0，上述新合并尚不能写成该稳定版功能。",
+      "judgment": "原生编码器修复不代表所有模板路径都防住同类输入；升级测试应覆盖控制拼写与真实客户端历史。AMD CI 的超时应归为验证缺口，不能推导模型质量差异。",
+      "sources": [
+        {
+          "name": "SMG #4072",
+          "url": "https://github.com/smg-project/smg/pull/4072"
+        },
+        {
+          "name": "SMG BFCL Issue #4045",
+          "url": "https://github.com/smg-project/smg/issues/4045"
+        },
+        {
+          "name": "SMG releases",
+          "url": "https://github.com/smg-project/smg/releases"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "48 小时回看：MiniMax 10-19 官方发布 M3.1 Flash，称采用更激进稀疏注意力，日常输出可达 200+ TPS、P50 170+ TPS；中国区公布每百万 token 输入/输出/缓存读取价格为人民币 1/4/0.1 元。文章称 API、MPlan、MiniMax Code 已上线，权重将稍后开放，而不是已可下载。速度与成本改善是厂商口径，不能当作独立横评。",
+    "judgment": "低延迟和缓存读价格正在成为 Agent 服务竞争点，但选型应比较相同任务成功率下的总 token、重试、缓存命中与端到端成本。权重未开放时，不能直接推导自托管经济性或作投资收益判断。",
+    "sources": [
+      {
+        "name": "MiniMax M3.1 Flash 官方发布",
+        "url": "https://minimax.cn/blog/minimax-m31f"
+      }
+    ]
+  },
+  "actions": [
+    "对 SMG PD 预发布构建复测空闲后长 prompt 突发、cache_aware 热前缀与过载 spill；同时注入真实冻结，核对 120 秒窗口不会掩盖故障。",
+    "建立 HTTP/ZMQ 超时矩阵，记录客户端总耗时、worker 尝试数、abort 到达与剩余 inflight；单独确认 ZMQ 的重试语义。",
+    "Rust SGLang servicer 升级前跑真实 0.5.22 scheduler smoke，并测试布局不匹配和禁用 grammar backend 的拒绝行为。",
+    "盘点 Go 构建工具链及产物版本；对 K8s protobuf buffer cap 用大对象流量比较 RSS 与 GC CPU。",
+    "启用 symmetric memory 的 vLLM 集群优先回归 collective 输出生命周期；MiniMax Flash 则用相同任务集评估成功任务成本，不照搬厂商 TPS。"
+  ]
+}
