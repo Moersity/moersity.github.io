@@ -1,0 +1,133 @@
+{
+  "date": "2026-10-22",
+  "title": "推理正确性边界：ZeroMQ 活性、KV 屏障与 offload 容量",
+  "deck": "截至 2026-10-22 09:00（Asia/Shanghai）。今日聚焦过去 24–48 小时合并的传输与缓存正确性修复，以及 Rust 信任链依赖、Kubernetes 维护分支和 AI 供应链扩产。下文时间均为北京时间；main 合并不等于稳定版发布，作者测试及厂商计划不作独立实测结论。",
+  "top_items": [
+    {
+      "title": "SMG：ZeroMQ 收包活性和传输背压修复",
+      "summary": "#4082 于 10-21 10:39 合并，将 zeromq 依赖 pin 到上游修复提交，处理 FairQueue 反复轮询 self-waking pending stream、使大帧接收连自身 timeout 都不能运行的问题。新增 transport-owned payload 预算，默认 256 消息 / 32 MiB，credit 保留至最后一个传输引用释放；空预算仍允许一条超限大消息。send 成功只表示本地入队，不代表网络 flush 或引擎确认。",
+      "judgment": "优先回归大帧、慢 peer、断连、取消和跨 rank 公平性。该预算是逻辑 payload 而非 RSS 上限，共享 writer 饱和仍可能影响其他 rank，不应把局部 IPC 测试当作 GPU 服务吞吐收益。",
+      "sources": [
+        {
+          "name": "smg-project/smg #4082",
+          "url": "https://github.com/smg-project/smg/pull/4082"
+        }
+      ]
+    },
+    {
+      "title": "SGLang：外部 KV linker 补齐 forward 写入屏障",
+      "summary": "#45559 于 10-22 04:53 合并。Mooncake/mori linker offload 同时等待 scheduler stream 页索引事件及 forward stream KV 写入事件，补上昨日 prefill read-done 提前放行优化的 external linker 边界。无 external linker 时行为不变；作者说明问题来自代码审阅，未在 main 复现。",
+      "judgment": "这是昨日优化的实质后续，但不能写成已复现数据损坏。回归应验证 forward/offload 并行时的 KV 内容一致性和事件顺序，而非只比较吞吐。",
+      "sources": [
+        {
+          "name": "sgl-project/sglang #45559",
+          "url": "https://github.com/sgl-project/sglang/pull/45559"
+        }
+      ]
+    },
+    {
+      "title": "vLLM：CPU offload 容量按最小 worker 对齐",
+      "summary": "#52921 于 10-22 08:22 合并。不均衡 pipeline ranks 或 speculative decoding 可令各 worker block 容量不同；修复在分配前按 MIN 同步容量，engine 取得对齐值后传给 scheduler，覆盖 SimpleCPUOffloadConnector 与 MultiConnector，避免越界复制。作者最新测试为 144 passed / 18 skipped，GPU 同步测试跳过。",
+      "judgment": "按正确性修复评估，重点复测异构层数 PP、spec decode 与 MultiConnector。旧 ROCm dummy-weight smoke 不能替代当前版本真实权重和 GPU 同步回归。",
+      "sources": [
+        {
+          "name": "vllm-project/vllm #52921",
+          "url": "https://github.com/vllm-project/vllm/pull/52921"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "SMG #4083（10-21 12:16）及 #4114（10-22 07:47）已合并：将 Messages 错误封装、SSE keepalive、trace response、body timeout 改为轻量 tower layer，并跳过未配置条件的 identity wrapper，保持 layer 顺序及原错误语义。#4100 于 10-22 04:08 合并，网关自行渲染 DeepSeek V4.1 的 medium 对当前 checkpoint 写入 Reasoning Effort: 62；HTTP regular/PD/external 上游自行渲染时，顶层 medium 仍按 vendor alias 转 high。已检查近期 PR、合并、Release 与重要 Issue；最新 Release 仍为北京时间 10-16 的 v1.13.0，上述修改不可视为该版本功能。",
+    "judgment": "高 QPS、短输出服务可对比 CPU/分配成本，但必须一起回归 408/413、SSE ping 与 Messages 错误封装。模型参数兼容性应按网关渲染和 HTTP 转发分开验 prompt，不把相同字段视作相同预算。",
+    "sources": [
+      {
+        "name": "smg-project/smg #4083",
+        "url": "https://github.com/smg-project/smg/pull/4083"
+      },
+      {
+        "name": "smg-project/smg #4114",
+        "url": "https://github.com/smg-project/smg/pull/4114"
+      },
+      {
+        "name": "smg-project/smg #4100",
+        "url": "https://github.com/smg-project/smg/pull/4100"
+      },
+      {
+        "name": "SMG v1.13.0",
+        "url": "https://github.com/smg-project/smg/releases/tag/v1.13.0"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Kubernetes #143255、#143256 于 10-21 22:45 合并，将 release-1.34 / release-1.35 的生产构建 Go 工具链更新至 1.26.10；PR 明确 kube-cross/go-runner 镜像尚未发布，这是昨日 main 更新之外的维护分支进展。#143223 于 10-21 16:53 合并，新增 ALPHA gauge kubelet_device_plugin_devices，按 resource_name、health_state 汇总 device manager 已知的健康/不健康设备，随 node status sync 刷新。vLLM #62826 于 10-21 23:01 合并，为 Rust frontend 加入 --custom-histogram-buckets，按 family 覆盖桶，未列 family 保留默认；不合法配置在启动时拒绝。",
+    "judgment": "安全补丁验收应核对实际构建产物，不把分支合并当作镜像已修复。设备 gauge 不是实时硬件遥测；Rust/Python 切换应对齐 TTFT/ITL 桶，避免分位数不可比，且该旗标不是动态热更新。",
+    "sources": [
+      {
+        "name": "kubernetes/kubernetes #143255",
+        "url": "https://github.com/kubernetes/kubernetes/pull/143255"
+      },
+      {
+        "name": "kubernetes/kubernetes #143256",
+        "url": "https://github.com/kubernetes/kubernetes/pull/143256"
+      },
+      {
+        "name": "kubernetes/kubernetes #143223",
+        "url": "https://github.com/kubernetes/kubernetes/pull/143223"
+      },
+      {
+        "name": "vllm-project/vllm #62826",
+        "url": "https://github.com/vllm-project/vllm/pull/62826"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "RustSec 与 SMG cargo-audit：修复依赖而不是重跑 CI",
+      "summary": "SMG 10-21 新建 Issue #4122 记录 rustls-webpki 0.103.14、webpki-root-certs/webpki-roots 1.0.9 的 emSign 信任链公告。RustSec 0382 标注修复范围 >=0.103.16 且 <0.104.0-alpha.1，或 >=0.104.0-alpha.8；0381 指向 webpki-roots >=1.0.10。0.26.11 兼容包转导出的独立 1.x 依赖也须解析到修复版本。",
+      "judgment": "检查最终 Cargo.lock 和传递依赖，而非只升级顶层 manifest 或反复重跑 audit。该 Issue 是已发现的依赖风险，不代表已经发生利用，也不能据此声称 SMG 修复已合并。",
+      "sources": [
+        {
+          "name": "SMG Issue #4122",
+          "url": "https://github.com/smg-project/smg/issues/4122"
+        },
+        {
+          "name": "RustSec 0382",
+          "url": "https://rustsec.org/advisories/RUSTSEC-2026-0382.html"
+        },
+        {
+          "name": "RustSec 0381",
+          "url": "https://rustsec.org/advisories/RUSTSEC-2026-0381.html"
+        }
+      ]
+    },
+    {
+      "title": "vLLM watchdog：为挂起保留线程栈证据",
+      "summary": "#55700 于 10-21 23:47 合并。V1 engine 与 multiprocess worker 心跳停滞时，通过 faulthandler 将所有线程栈写入逐进程日志；默认 timeout 300 秒、检查间隔 10 秒，持续未恢复的超时只记录一次。",
+      "judgment": "这是诊断工具而非自动恢复或请求 SLA。与网关请求超时、进程重启、日志留存分开设置，让故障现场不会在重启前丢失。",
+      "sources": [
+        {
+          "name": "vllm-project/vllm #55700",
+          "url": "https://github.com/vllm-project/vllm/pull/55700"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "NVIDIA 10-21 官方公告与供应链伙伴扩产计划：基板协议以未来三年产能扩大至 2.5 倍为目标，并向 KYEC 提供 11 亿美元产能预付款，支持美国测试设施，目标 2027 年 4 月量产。公告也涵盖先进封装与光学引擎扩产。这些是公司披露的协议、目标与前瞻计划，并非当前已经交付的产能。",
+    "judgment": "AI 基础设施瓶颈不止 GPU 晶圆，也涉及封装、基板、测试和互连。工程采购应核对实际交付窗口、系统集成和可用机架容量，不能由扩产目标直接推导推理成本下降或投资收益。",
+    "sources": [
+      {
+        "name": "NVIDIA 官方供应链公告",
+        "url": "https://nvidianews.nvidia.com/news/nvidia-and-supply-chain-partners-expand-capacity-to-accelerate-ai-infrastructure-buildout"
+      }
+    ]
+  },
+  "actions": [
+    "对 SMG 新构建注入大帧、慢 peer、断连与取消，分别记录逻辑 payload、RSS、超时活性及不同 rank 的影响。",
+    "使用 Mooncake/mori external linker 的 SGLang 部署补做 forward/offload 并行一致性回归；不要把未复现的风险写成已发生故障。",
+    "在 vLLM PP/spec decode/MultiConnector 组合上核对所有 worker 与 scheduler 的 offload block 容量，并运行真实 GPU 回归。",
+    "对 Rust 网关解析最终依赖树和锁文件，更新受影响信任链依赖；Go/Kubernetes 则核对实际二进制与镜像工具链版本。",
+    "统一 Rust/Python histogram 桶，接入设备健康 gauge，并在自动重启前保留 watchdog 栈日志。"
+  ]
+}
