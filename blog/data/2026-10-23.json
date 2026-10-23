@@ -1,0 +1,117 @@
+{
+  "date": "2026-10-23",
+  "title": "停止要释放算力，KV 传输要守住一致性",
+  "deck": "截至 2026-10-23 09:00（Asia/Shanghai）。今日聚焦 SMG 的停止与 PD connector 修复，以及 HiCache、故障恢复、Rust 指标和 Kubernetes 部署边界；补充近两日官方云服务与 Go 生态动态。下文时间均为北京时间；main 合并不等于稳定版发布，作者测试和厂商测试不作独立实测结论。",
+  "top_items": [
+    {
+      "title": "SMG：本地 stop 不再让引擎继续空转",
+      "summary": "#4040 于 10-22 21:47 合并。网关流式输出命中 stop 字符串或 stop_token_ids 后，若下一条消息仍是 token chunk，所有 choice 关闭后走 abort；先中止引擎，再发送 finish/usage，避免慢客户端继续占住资源。usage 结算至 stop 命中步骤，不计尾部生成。",
+      "judgment": "优先验证 KV/slot 释放、usage、多 choice 和 EOS。n>1 要等全部 choice 结束；非流式仍先收完整输出，不能宣称本次同时修好。mock engine 数字不等于 GPU 吞吐收益。",
+      "sources": [
+        {
+          "name": "SMG #4040",
+          "url": "https://github.com/smg-project/smg/pull/4040"
+        }
+      ]
+    },
+    {
+      "title": "SMG：MultiConnector 识别真正搬运 KV 的子组件",
+      "summary": "#4155 于 10-22 21:48 合并。vLLM servicer 的 PD connector 解析扩展到 store 家族与 MoRIIO；单一 P2P mover 通常优先，单一 store 其次，歧义组合保留 wrapper、不猜测。MoRIIO 与恰好一个 store 组合投影为 store，单独 MoRIIO 的 gRPC PD handoff 仍明确拒绝。",
+      "judgment": "检查 GetServerInfo、store mode、bootstrap 探测及 peer 配对，不能仅用 worker 健康证明拓扑正确。CPU 单测不是 store+offload wrapper 的真实 GPU 拓扑验收。",
+      "sources": [
+        {
+          "name": "SMG #4155",
+          "url": "https://github.com/smg-project/smg/pull/4155"
+        }
+      ]
+    },
+    {
+      "title": "SGLang：HiCache write-through 补齐最后 token 写入顺序",
+      "summary": "#42701 于 10-23 05:46 合并，为 HiCache write-through 的 D2H copy 增加对 forward stream 的等待，修复最后 token KV 尚未写完就被搬到 host 的竞争。与昨日 external linker 屏障不同，这次针对 HiCache 路径。",
+      "judgment": "回归多轮 prefix reuse 的输出一致性，覆盖写入、卸载、重新载入的事件顺序。局部复现成功不代表所有 GPU、模型和缓存模式都已验证，吞吐对比也应同时报告正确性。",
+      "sources": [
+        {
+          "name": "SGLang #42701",
+          "url": "https://github.com/sgl-project/sglang/pull/42701"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "vLLM #56430 于 10-23 02:14 合并，故障恢复时保留 KV transfer 状态，先排空所有 worker 响应队列再抛错；恢复可用的传输输出，但丢弃可能破坏 quorum 语义的 cache events。SMG 已检查近期 PR、合并、Release 与重要 Issue；最新 Release 仍为北京时间 10-16 的 v1.13.0。新 Issue #4191 仍 open，记录 Oct21/22 多种 vLLM PD 拓扑启动死亡、不健康及 503 的回归分类，尚不能由此确定根因或声称修复完成。",
+    "judgment": "升级评估应按故障阶段和实际 PD 拓扑组织测试：worker 崩溃、响应队列排空、KV transfer 状态恢复与缓存事件一致性分别验收。不要把 connector 解析修复与所有启动回归画等号。",
+    "sources": [
+      {
+        "name": "vLLM #56430",
+        "url": "https://github.com/vllm-project/vllm/pull/56430"
+      },
+      {
+        "name": "SMG Issue #4191",
+        "url": "https://github.com/smg-project/smg/issues/4191"
+      },
+      {
+        "name": "SMG v1.13.0",
+        "url": "https://github.com/smg-project/smg/releases/tag/v1.13.0"
+      }
+    ]
+  },
+  "backend": {
+    "content": "SMG Rust servicer #4149 于 10-22 23:37 合并，可用 --metrics-port 开启独立 /metrics listener，覆盖 vLLM、SGLang、TokenSpeed wire，默认关闭；逐 chunk ITL 样本队列有界，压力下丢样并暴露 dropped 指标。Helm #4188 于 10-23 00:52 合并，worker 默认镜像仓库改为 ghcr.io/smg-project/smg，worker 不再跟随 global.image.repository。Go 团队 10-21 开放年度开发者调查，截止 11-03，属于生态反馈渠道而非新版本发布。",
+    "judgment": "Rust 指标接入需一起监控 dropped，避免采样损失扭曲延迟判断。私有镜像部署应显式设置 workers[].image.repository，先比对 helm template 再验证集群拉取；chart lint 通过不等于镜像可拉取。Go 团队可将真实服务痛点反馈给上游，不必因调查公告触发升级。",
+    "sources": [
+      {
+        "name": "SMG Rust servicer #4149",
+        "url": "https://github.com/smg-project/smg/pull/4149"
+      },
+      {
+        "name": "SMG Helm #4188",
+        "url": "https://github.com/smg-project/smg/pull/4188"
+      },
+      {
+        "name": "Go 2026 调查公告",
+        "url": "https://go.dev/blog/survey2026-announce"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "vLLM Mooncake：传输指标接入并修复 wrapper 注册",
+      "summary": "#56939 于 10-23 07:52 合并，新增传输时间、字节、descriptor 直方图与失败、接收、KV 过期计数；同时修复 Mooncake 放入 MultiConnector 时，首次 stats report 因指标未注册触发 AssertionError。push-based Mooncake 的直方图仅由 prefiller 填充。",
+      "judgment": "按 P/D 角色解释指标，decode 没有直方图不等于没有传输。灰度时联合观察传输失败与过期请求，不能仅凭总 tokens/s 判断跨机 KV 路径健康。",
+      "sources": [
+        {
+          "name": "vLLM #56939",
+          "url": "https://github.com/vllm-project/vllm/pull/56939"
+        }
+      ]
+    },
+    {
+      "title": "Kubernetes ShardedListAndWatch：关注控制面扩展的验收方法",
+      "summary": "#142702 于 10-23 05:57 合并到 master，将 ShardedListAndWatch 推进到 Beta。PR 的性能比较受到已知 WatchList deepcopy 低效的影响，不能把所有相对收益都归于分片机制。",
+      "judgment": "将其作为设计与压测材料，而非已发布版本能力。按对象数量、分片分布、重连及 watch 负载重测 apiserver 与客户端资源，并核对目标版本和 feature gate。",
+      "sources": [
+        {
+          "name": "Kubernetes #142702",
+          "url": "https://github.com/kubernetes/kubernetes/pull/142702"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "Google Cloud 10-21 宣布搭载 NVIDIA RTX PRO 6000 Blackwell Server GPU 的 Confidential G4 正式可用，覆盖 36 个 zone，可用于 Compute Engine VM 与 GKE node；Confidential Space 支持则计划在随后数周推进 GA。官方在 g4-standard-48 的指定模型测试中报告吞吐下降小于 3.5%，这是特定配置的厂商结果，不是所有推理工作负载的保证。",
+    "judgment": "推理基础设施的采购维度正从单纯 token 成本扩展到数据使用中保护和可验证执行。验收应将远程证明、密钥释放策略、驱动兼容与实际 TTFT/吞吐一并纳入；加密环境不自动解决应用权限、输出泄露或合规的全部问题。",
+    "sources": [
+      {
+        "name": "Google Cloud Confidential G4 GA",
+        "url": "https://cloud.google.com/blog/topics/ai-infrastructure/confidential-g4-gpus-are-ga"
+      }
+    ]
+  },
+  "actions": [
+    "对 SMG 流式 stop 注入慢客户端、多 choice 与 EOS，核对终止后 engine slot/KV 释放及 usage，非流式另测。",
+    "按实际 MultiConnector 子组件组合核验 PD peer 配对，保留启动失败现场，并跟踪 #4191 而不预设根因。",
+    "为 HiCache write-through 增加多轮 prefix reuse 一致性回归；对 vLLM 故障恢复注入 worker 失败，核对传输状态与 cache events。",
+    "显式检查 Helm worker 镜像完整地址，接入 Rust servicer 指标和 dropped 告警，再进行灰度。",
+    "评估机密 GPU 时使用自身模型、并发和证明策略复测，不把厂商特定测试或未来 GA 计划作为当前交付保证。"
+  ]
+}
