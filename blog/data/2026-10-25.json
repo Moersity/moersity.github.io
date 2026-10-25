@@ -1,0 +1,137 @@
+{
+  "date": "2026-10-25",
+  "title": "预热成功要看真正执行，路由选定的 rank 要真正落地",
+  "deck": "截至 2026-10-25 09:00（Asia/Shanghai）。本期聚焦 SMG 的预热验收、rank 路由与请求级故障隔离，并追踪 AMD collective、推测解码和小内存端侧模型。除官方公告日期外，时间均为北京时间；合并到 main 不等于稳定版已发布，作者测试与厂商指标不视为独立实测。",
+  "top_items": [
+    {
+      "title": "SMG：预热收到 abort，不能算 shape 已覆盖",
+      "summary": "#4434 于 10-25 08:23 合并，将 abort/error finish，以及 INVALID_ARGUMENT、RESOURCE_EXHAUSTED 拒绝状态计为 UnservedRequest；此前 gRPC 调用正常返回也可能被算作覆盖。已有成功 step 后，连续被拒绝的 shape 不再提前终止后续预热；从首个请求就全部拒绝仍在三个 step 后停止。",
+      "judgment": "上线门槛应检查 served shapes 和失败原因，不能只看 RPC OK 或耗时。此修复改变预热统计，不改变客户端收到的业务状态，也不证明所有 CUDA graph/JIT shape 都已覆盖。",
+      "sources": [
+        {
+          "name": "SMG #4434",
+          "url": "https://github.com/smg-project/smg/pull/4434"
+        }
+      ]
+    },
+    {
+      "title": "SMG：Rust SGLang servicer 不再丢弃 Router 的 rank pin",
+      "summary": "#4414 于 10-25 08:23 合并。data_parallel_rank 增加显式 presence，区分 rank 0 和未指定；routed_dp_rank 传入 scheduler 请求并决定对应 socket。多 rank 的越界 pin 在提交前拒绝，单 rank 引擎按前端规则忽略 pin。",
+      "judgment": "缓存亲和性要验证实际执行 rank，而非只看网关选中了谁。该 PR 不修改 Python servicer；多 scheduler rank 的 PD leg 尚需后续 #4460/#4461，截点仍未合并，不应将普通 DP 修复外推为完整 PD 支持。",
+      "sources": [
+        {
+          "name": "SMG #4414",
+          "url": "https://github.com/smg-project/smg/pull/4414"
+        },
+        {
+          "name": "SMG #4460",
+          "url": "https://github.com/smg-project/smg/pull/4460"
+        },
+        {
+          "name": "SMG #4461",
+          "url": "https://github.com/smg-project/smg/pull/4461"
+        }
+      ]
+    },
+    {
+      "title": "SMG：模型输出解析 panic 收敛为单请求错误",
+      "summary": "#4135 于 10-25 08:27 合并，对 chat/messages 的流式和整包读取做请求边界隔离。流式 chat 返回 reader_panicked 错误事件后发 [DONE]，非流式返回 500；Messages 流按其协议返回 error 事件。新增 panicked 计数，错误日志带请求归属。",
+      "judgment": "客户端应解析流内错误，不能把已有 HTTP 200 或 [DONE] 当业务成功。该错误不归咎 worker、不开 breaker；结构化 panic 消息会脱敏截断，但原 panic hook 仍输出 stderr，日志治理不能只检查新字段。",
+      "sources": [
+        {
+          "name": "SMG #4135",
+          "url": "https://github.com/smg-project/smg/pull/4135"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "SMG #4440（10-25 08:23）修正 KV replay 指标：replay_requested 只记 gap 发现，missed_batches 仅在最终 unrecovered 时累加，避免成功重放仍算丢失或失败重复计数。#4405（10-25 01:51）让 Rust SGLang servicer 传递图像 tensors 与 processor output；#4413（04:06）补充 EPD language-only 的 encoder dispatch，失败通知发往请求所属 rank，图像引用之外的视频/音频引用仍拒绝。已检查近期 PR、合并、Release 与重要 Issue；最新 Release 仍为 10-16 北京时间的 v1.13.0。",
+    "judgment": "KV gap 告警应区分暂时缺口与不可恢复丢失，不能把计数降低当路由质量自然改善。多模态迁移需比较实际 tensor/layout 与输出；#4191 的 10-24 nightly triage 仍报告 vLLM/Mooncake 多拓扑失败，并将其归于 runner 显存争用，这是项目排查记录而非本日报独立根因证明。",
+    "sources": [
+      {
+        "name": "SMG #4440",
+        "url": "https://github.com/smg-project/smg/pull/4440"
+      },
+      {
+        "name": "SMG #4405",
+        "url": "https://github.com/smg-project/smg/pull/4405"
+      },
+      {
+        "name": "SMG #4413",
+        "url": "https://github.com/smg-project/smg/pull/4413"
+      },
+      {
+        "name": "SMG PD nightly #4191",
+        "url": "https://github.com/smg-project/smg/issues/4191"
+      },
+      {
+        "name": "SMG v1.13.0",
+        "url": "https://github.com/smg-project/smg/releases/tag/v1.13.0"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Kubernetes #143147 于 10-24 01:51 合并：compressLog 开始检查 gzip writer 与临时文件的 Close 错误，失败时清理临时文件并保留原日志，避免磁盘写满后将不完整 gzip 替换原件。Go 与 Rust 官方主博客最新可见分别仍为 10-21 survey 和 10-20 rustup 公告，本期未检得窗口内新公告，不重复旧消息。",
+    "judgment": "Go 的流式写入必须把 Close/flush 作为提交边界，copy 成功不等于文件完整。建议给节点日志轮转加入 ENOSPC 故障注入，验证原日志保留和后续重试；该合并尚不能视为当前集群版本已有修复。Rust 工程重点仍在本期 SMG 的 presence、panic 隔离与有界缓存，而非语言版本追新。",
+    "sources": [
+      {
+        "name": "Kubernetes #143147",
+        "url": "https://github.com/kubernetes/kubernetes/pull/143147"
+      },
+      {
+        "name": "Go 官方博客",
+        "url": "https://go.dev/blog/"
+      },
+      {
+        "name": "Rust 官方博客",
+        "url": "https://blog.rust-lang.org/"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "SMG PreparedTools：缓存工具 schema 的渲染值，而非每次重建",
+      "summary": "#4427 于 10-25 08:24 合并，按工具集序列化字节复用模板值。大于 64 KiB 的序列化工具集直接按请求处理；保留表限制单项估重 1 MiB、总估重 16 MiB 和 64 个工具集，下一项将超过总量或数量限制时重置。命中仍比较字节，chat 与 Messages 共用。",
+      "judgment": "适合固定工具集、多轮消息的工作负载。作者 mock 测试中 allocation calls 减少约 25.6%，不能当 GPU 端到端吞吐增益；估算权重也不是 RSS 硬上限，需压测工具集 churn、巨型 enum 和未命中成本。",
+      "sources": [
+        {
+          "name": "SMG #4427",
+          "url": "https://github.com/smg-project/smg/pull/4427"
+        }
+      ]
+    },
+    {
+      "title": "SGLang AMD collective 与 vLLM draft budget：先守住规模边界",
+      "summary": "SGLang #34543（10-25 06:36）将超过 16 MiB 工作缓冲的 deterministic all-reduce 改为复用缓冲分块，修复大输入错误归约与注册表耗尽。vLLM #58466（04:35）让 batch-sharded sampling 在 draft budget 受限时读取实际 admitted draft counts，避免 host 上界与 GPU 实际数不一致。",
+      "judgment": "前者验收应覆盖缓冲边界和长时重复归约，不能把错误旧实现当性能基线；后者用 host 等待换取准确分片，需联合测峰值 logits 显存、低并发延迟和 CPU run-ahead。两项作者硬件测试均不保证所有模型/硬件相同表现。",
+      "sources": [
+        {
+          "name": "SGLang #34543",
+          "url": "https://github.com/sgl-project/sglang/pull/34543"
+        },
+        {
+          "name": "vLLM #58466",
+          "url": "https://github.com/vllm-project/vllm/pull/58466"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "NVIDIA 10-23 发布 Nemotron 3.5 Bolt E4B 4GB，基于 Gemma 4 E4B 后训练，面向本地 conversational agents，提供多轮工具使用、可配置 reasoning 与 64k context。官方称目标负载可低至约 4GB 占用，并将设备/语音助手、交互角色及机器人接口列为应用方向。",
+    "judgment": "这是端侧模型产品化信号，评估应转向每 GB 质量、交互尾延迟和与视觉/语音模块共存的预算。4GB 是目标工作负载口径，不代表任意上下文、并发或完整多模态流水线都只占 4GB；厂商质量与 token 节省指标不能直接推导采购回报。",
+    "sources": [
+      {
+        "name": "NVIDIA Bolt E4B 4GB 官方发布",
+        "url": "https://research.nvidia.com/labs/nemotron/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB/"
+      }
+    ]
+  },
+  "actions": [
+    "把预热验收从 RPC 成功改为实际 covered/failed shapes，注入 abort 与 admission refusal，确认后续有效步骤仍执行。",
+    "对 cache-aware + DP 记录选中 rank 和 scheduler 实际执行 rank，覆盖 rank 0、未指定、越界，以及 Python/Rust servicer 差异。",
+    "用故障输出测试流内 reader_panicked、Messages error 与非流式 500，检查客户端状态机及 stderr 是否泄露模型内容。",
+    "KV event 告警分别统计 replay requested 与 unrecovered batches；多模态升级分别验证 tensor 路径、EPD 引用路径和失败清理。",
+    "对 GPU collective 与 speculative decoding 先做边界尺寸和输出一致性回归，再比较吞吐与同步开销。"
+  ]
+}
