@@ -1,0 +1,144 @@
+{
+  "date": "2026-10-26",
+  "title": "gRPC 超时开始真正回收请求，DP 缓存归属与 TTFT 口径纠偏",
+  "deck": "截至 2026-10-26 08:59（Asia/Shanghai）。本期重点是 SMG 的请求生命周期、rank 级缓存索引与 PD 计时；另看 KV 传输失败后的内存所有权、投机解码元数据及控制面重试。除另注明外，时间为北京时间；main 合并不等于稳定版发布，未合并提案与作者测试均单独标明。",
+  "top_items": [
+    {
+      "title": "SMG：默认 1800 秒请求超时扩展至 gRPC worker",
+      "summary": "#4001 于 10-26 03:41 合并。每次 attempt 从 admission 后的 dispatch 到最后一条消息共用 deadline；网关超时会 abort engine 请求并释放负载，非流式返回 504 / call_upstream_timeout，已开始的流发送错误事件。网关自己的 deadline 不进入重试，避免再等待一个完整超时周期。",
+      "judgment": "这是升级行为变化：单次生成超过 30 分钟需显式调整 --request-timeout-secs。它不是 idle timeout，也不是总排队预算；直接 ZMQ wire 目前仅 dispatch 有界，流尚无 deadline hook，EPD encode leg 仍使用自己的接收超时。",
+      "sources": [
+        {
+          "name": "SMG #4001",
+          "url": "https://github.com/smg-project/smg/pull/4001"
+        }
+      ]
+    },
+    {
+      "title": "SMG：每个 DP rank 只索引自己的 KV 事件",
+      "summary": "#4499 于 10-26 01:51 合并。此前各 rank worker 都索引整个 engine 的事件，block 集合相同使 prefix overlap 打平。现在仅应用自身 rank 的 batch，无 rank 的 batch 仍共享；其他 rank 事件继续参与 cursor、gap、replay 和 snapshot bookkeeping。",
+      "judgment": "这是 cache-aware 路由正确性修复，而非通用吞吐优化。验证时同时看实际执行 rank、prefix hit 和重连后的索引恢复；不能为了过滤其他 rank 而跳过恢复游标。作者四 rank vLLM 的收益只适用于其测试负载。",
+      "sources": [
+        {
+          "name": "SMG #4499",
+          "url": "https://github.com/smg-project/smg/pull/4499"
+        }
+      ]
+    },
+    {
+      "title": "SMG：PD 路由 TTFT 上升，可能只是补回漏算的 prefill",
+      "summary": "#4497 于 10-26 04:09 合并，Messages、单条/批量 completions 与 Harmony 的 PD 分支接入 pd_timing。相关流计时锚定 prefill dispatch，首个 decode token/frame 记录 PD first-token 指标；批量 completion 使用最早 prefill dispatch。",
+      "judgment": "升级前后必须标注指标口径变化，不把此前漏计 prefill 的极低 TTFT 当性能基线。Harmony Responses 只补 PD pair 记录，不能等同其他路线的全部 stream timing；PR 仍欠 live PD 的分路线 histogram 测量。",
+      "sources": [
+        {
+          "name": "SMG #4497",
+          "url": "https://github.com/smg-project/smg/pull/4497"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "SMG #4485（10-25 20:33）让 vLLM Rust servicer 优先按已连接 engine 数报告 DP width，使 GetServerInfo、初始零负载和 pin 范围一致。#4460（10-25 09:14）已支持 attention-DP 形态的多 rank SGLang PD leg；prefill 仍按 bootstrap_room % dp_size 放置，plain-DP replicas 形态仍拒绝。router room 对齐所选 prefill rank 的 #4461 截点仍未合并。已检查近期 PR、Release 与重要 Issue；最新正式版本仍为 v1.13.0，以上不能当成该稳定版本已有能力。#4191 的 10-25 nightly triage 记录 9 failed / 104 passed，并将 vLLM 三类 PD topology 失败指向 runner 可用显存不足。",
+    "judgment": "先确认 gateway 实际注册 N 个 rank worker，再测试缓存选择与最终 prefill rank 是否一致。servicer 放开多 rank PD 不代表路由闭环完成。nightly 的资源争用判断来自项目 triage，不能直接定性为引擎算法回归，也不能用其他 lane 通过证明所有拓扑可上线。",
+    "sources": [
+      {
+        "name": "SMG #4485",
+        "url": "https://github.com/smg-project/smg/pull/4485"
+      },
+      {
+        "name": "SMG #4460",
+        "url": "https://github.com/smg-project/smg/pull/4460"
+      },
+      {
+        "name": "SMG #4461（未合并）",
+        "url": "https://github.com/smg-project/smg/pull/4461"
+      },
+      {
+        "name": "SMG v1.13.0",
+        "url": "https://github.com/smg-project/smg/releases/tag/v1.13.0"
+      },
+      {
+        "name": "10-25 PD nightly triage",
+        "url": "https://github.com/smg-project/smg/issues/4191#issuecomment-6399642100"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Kubernetes #143386（10-25 13:16 创建，未合并）提议 client-go 在 Retry-After 下界上增加 0–10% jitter，减少同步重试。Go flate 修复 CL 853285 的 Patch Set 5 于 10-26 08:34 获得 TryBot 通过，镜像 #82452 仍未合并：小于 128B 的 Flush 会清空匹配历史，影响 levels 1–6 的压缩率，其中 levels 2–6 属于相对 Go 1.26 的回归。Rust #164931 于 10-26 07:22 合并 compiler rollup，包含 hot-path inline、builtin macro attributes fast path 与 query-cache DefId 去重。",
+    "judgment": "把它们分别归类为控制面退避提案、压缩率回归修复评审与编译器 main 演进，不写成发行版升级通知。重试 jitter 不能低于服务端 Retry-After；紧 deadline 可能先到期。Go 验收应使用小 Flush 分片的真实流量；Rust 编译器改动不等于服务运行吞吐提升。",
+    "sources": [
+      {
+        "name": "Kubernetes #143386（未合并）",
+        "url": "https://github.com/kubernetes/kubernetes/pull/143386"
+      },
+      {
+        "name": "Go CL 853285",
+        "url": "https://go-review.googlesource.com/c/go/+/853285"
+      },
+      {
+        "name": "Go 官方镜像 #82452",
+        "url": "https://github.com/golang/go/pull/82452"
+      },
+      {
+        "name": "Rust #164931",
+        "url": "https://github.com/rust-lang/rust/pull/164931"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "Mooncake：同步 transfer 返回失败，不一定代表 buffer 可以复用",
+      "summary": "#4928 于 10-25 23:02 创建，尚未合并。提案让失败 batch 在释放/重试前等待所有 task 终止；若 deadline 到达仍有任务在途，返回 -2 / COMPLETION_UNKNOWN，要求保持 buffer 存活。作者 TCP 故障复现指出，过早复用可能把后续请求的数据写入旧 decode 页。",
+      "judgment": "重点是 completion 与内存所有权契约，不只是错误码。现有上层把 -2 当普通失败并不足以证明安全回收，需核对 connector 对未确定完成的 buffer 保留策略；作者 TCP 实验不是 RDMA 或端到端 serving 的全面验证。",
+      "sources": [
+        {
+          "name": "Mooncake #4928（未合并）",
+          "url": "https://github.com/kvcache-ai/Mooncake/pull/4928"
+        }
+      ]
+    },
+    {
+      "title": "vLLM 与 SGLang：KV offload 回滚、投机解码 shape 合同仍在评审",
+      "summary": "vLLM #63628（10-26 08:53 创建，未合并）在 P2P offload descriptor 准备失败时回滚尚未发布的 NIXL registration。SGLang #46477（07:41 创建，未合并）修正 DSpark sample_from_anchor=False 的 FA3/FA4 query width，应跟随统一的 decode_num_tokens_per_req，而不是错误使用 draft γ。",
+      "judgment": "前者作者测试包含 P2P 单元与 native NIXL DRAM/UCX 验证，但无多机 serving/RDMA 故障测试；后者作者只有 CPU 测试、没有 GPU 重测。适合作为失败注入与 shape 边界用例来源，不宜把提案直接当可升级版本或复现成功结论。",
+      "sources": [
+        {
+          "name": "vLLM #63628（未合并）",
+          "url": "https://github.com/vllm-project/vllm/pull/63628"
+        },
+        {
+          "name": "SGLang #46477（未合并）",
+          "url": "https://github.com/sgl-project/sglang/pull/46477"
+        }
+      ]
+    },
+    {
+      "title": "SMG Responses：前台断开应 abort，后台任务则继续",
+      "summary": "#3706 于 10-26 03:42 合并，将客户端断开检测贯穿 Responses 中间 relay，避免底层 engine 在停滞流上仍认为客户端存在。前台断开后立即 drop chat body 触发 abort；background: true 继续生成并保存结果。",
+      "judgment": "回归测试要分别覆盖取消、网络断开、上游无输出与后台持久化，不能把所有断连都当取消。Harmony Responses 直接读取 engine 的断开和终态 bookkeeping 尚未由此 PR 补齐。",
+      "sources": [
+        {
+          "name": "SMG #3706",
+          "url": "https://github.com/smg-project/smg/pull/3706"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "NVIDIA 的 Oracle AI World 官方议程列出 10-25 至 10-28 拉斯维加斯活动；10-27 的专题聚焦 OCI rack-scale 推理经济性与 tokens per watt，并安排 NeMo Switchyard 模型路由工作坊，讨论将执行步骤交给较小模型、复杂规划再升级到 frontier model。这里引用的是议程，不是当日新产品发布或已经交付的性能结果。",
+    "judgment": "值得关注的产业信号是成本讨论从单卡峰值转向完整工作流：路由、检索、CPU 编排、小模型与机架级能效共同决定成本。采购或投资判断仍需实际可用容量、价格、质量与尾延迟证据，不能把会场目标或厂商议程当兑现收益。",
+    "sources": [
+      {
+        "name": "NVIDIA at Oracle AI World 2026 官方议程",
+        "url": "https://www.nvidia.com/en-us/events/oracle-ai-world/"
+      }
+    ]
+  },
+  "actions": [
+    "升级 SMG 前核对 gRPC 请求最长生成时间；分别注入 dispatch 不返回、首 token 后停滞，验证 504/流内错误、engine abort 与 worker 负载归零。",
+    "对 DP cache-aware 记录 GetServerInfo width、注册 worker 数、选中 rank 与实际执行 rank；重连、replay 和无 rank batch 都纳入回归。",
+    "在看板发布记录标注 PD TTFT 计时锚点变化，按 API 路线比较；不要把补回 prefill 耗时误判成性能下降。",
+    "对 KV transfer 部分失败与 deadline 做 buffer 复用故障注入，区分安全失败和 completion unknown，先确认没有迟到写入再释放内存。",
+    "将未合并的 Mooncake、vLLM、SGLang 与 client-go 改动保留为观察和测试用例，不直接当生产修复；Responses 前台取消与后台继续分开验收。"
+  ]
+}
