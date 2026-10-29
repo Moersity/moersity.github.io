@@ -1,0 +1,117 @@
+{
+  "date": "2026-10-29",
+  "title": "多模态复用落地，默认解析器切换与 KV 异步写入边界需回归",
+  "deck": "截至 2026-10-29 09:00（Asia/Shanghai）。SMG 新合并覆盖 GLM/MiniMax worker 媒体复用与 Symphony 默认值；引擎侧继续修正异步 KV 生命周期。时间均为北京时间；合并、发版、作者测量与独立验证分别表述。",
+  "top_items": [
+    {
+      "title": "SMG：GLM 与 MiniMax 的 worker 媒体复用已合并",
+      "summary": "#4721 于 10-29 08:44 合并，为 GLM-5.3-Flash、MiniMax M3.1 Flash 提供 opt-in Rust worker 预处理及 P/D 无像素元数据复用，包含请求绑定校验、受限哈希、单节点 TP 共享内存广播与五秒回退；不包含 DeepSeek。",
+      "judgment": "作者 B300 1P1D/TP8 完整 HTTP/gRPC 路径比较报告 GLM 吞吐 +12.34–42.42%、MiniMax +8.54–74.63%，不能归因于复用单项。GLM 基于 e29e4248e 且两组共享实验 KDA overlay；MiniMax 两组社区 SHA 不同。两轮合成媒体实验中 GLM 4 秒视频 E2E p95 反而 +1.40%；这些数字不是最终合并树的独立 GPU 验证。",
+      "sources": [
+        {
+          "name": "SMG #4721",
+          "url": "https://github.com/smg-project/smg/pull/4721"
+        }
+      ]
+    },
+    {
+      "title": "SMG：Symphony 成为默认解析器，升级镜像可能直接改变行为",
+      "summary": "#4677 于 10-29 04:57 合并，将 chat/messages 及相关 responses 路径默认解析器切到 Symphony。--parser legacy、配置 parser: legacy 和 X-SMG-Parser: legacy 保留回退；响应 x-smg-parser 可用于确认。转录仍保留 legacy，Harmony 仍走独立路径。",
+      "judgment": "Helm 默认不渲染 parser 参数，因此跟随镜像默认值。先用同一批 reasoning/tool-call 流量对照终帧与工具参数；旧结构化标签编译器必须如实声明 vocabulary。PR 仍列出真实引擎 canary 待办，不能把默认切换等同于所有线上组合已验证。",
+      "sources": [
+        {
+          "name": "SMG #4677",
+          "url": "https://github.com/smg-project/smg/pull/4677"
+        }
+      ]
+    },
+    {
+      "title": "异步 KV 加载：写入要排在仍使用缓存的 forward 之后",
+      "summary": "SGLang #45580 与 vLLM #63827 分别于 10-29 05:29、06:29 合并，处理外部加载与在途 forward/step 的排序。两者都把 KV 缓冲区读写生命周期作为关键边界，而不是仅确认传输已发起。",
+      "judgment": "回归应刻意制造前一轮计算未完成、新请求 KV 已到达的交叠；吞吐损失与正确性分开记录。vLLM 最终改为延后所有 HiSparse 异步加载，早期选择性延后版本的 GPU 数据不能直接当最终实现收益。",
+      "sources": [
+        {
+          "name": "SGLang #45580",
+          "url": "https://github.com/sgl-project/sglang/pull/45580"
+        },
+        {
+          "name": "vLLM #63827",
+          "url": "https://github.com/vllm-project/vllm/pull/63827"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "vLLM #63513 于 10-29 08:18 合并，在 Mooncake 混合 cache group 存储中跳过 padding，减少无效字节而保持 key 命名不变。SMG 另有未合并 #4732：冷 L1 admission 改为几何间隔 checkpoint 加最深边界，避免逐边界复制累计前缀。已检查 SMG 近期 PR、重要 Issue 与 Release；最新正式版仍是 v1.13.0，main 的新行为不应套在该发行版上。",
+    "judgment": "混合 KV 优化必须逐层验证布局、对象尺寸及恢复后的 token 一致性。L1 减少复制不保证短会话收益：作者明确无可靠八轮吞吐提升，部分首次 sibling 命中变慢；缓存逻辑预算也不是进程 RSS 上限。",
+    "sources": [
+      {
+        "name": "vLLM #63513",
+        "url": "https://github.com/vllm-project/vllm/pull/63513"
+      },
+      {
+        "name": "SMG #4732",
+        "url": "https://github.com/smg-project/smg/pull/4732"
+      },
+      {
+        "name": "SMG v1.13.0",
+        "url": "https://github.com/smg-project/smg/releases/tag/v1.13.0"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Kubernetes #143439 于 10-29 05:53 合并 cel-go 0.29.2→0.33.0，模块路径改为 cel.dev/cel-go，并固定 CostModelVersion(0)、OptionalTypesVersion(2)。跨包传递 CEL 类型的 Go 项目应检查 imports 和类型兼容。Rust 侧，SMG draft #4736 提议把 pulldown-cmark 0.13.4 升至 0.13.5，处理 RUSTSEC-2026-0414；目前尚未合并。",
+    "judgment": "这是 Kubernetes main 的库变更，不是稳定版发布；成本模型固定仍不代表全部语义不变，type() 估算、错误调用计费与编译错误文本应回归。audit 告警与运行时暴露分开：#4736 作者称依赖经 prost-build 只用于构建，仍需按实际依赖图确认。",
+    "sources": [
+      {
+        "name": "Kubernetes #143439",
+        "url": "https://github.com/kubernetes/kubernetes/pull/143439"
+      },
+      {
+        "name": "SMG #4736",
+        "url": "https://github.com/smg-project/smg/pull/4736"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "冷前缀 admission：用复制量和分支访问代价评价缓存策略",
+      "summary": "SMG #4732 给出几何 checkpoint 的边界：几何累计复制不超过最深前缀的两倍，最后边界最多再加一次复制。作者约 750k token / 1024 turn 的串行试验报告 GLM/MiniMax 从 2938/5888 MiB 降到 5.7 MiB 每请求。",
+      "judgment": "这是本地合成 burst 和复制体积测量，不是服务器持续 QPS 或推理 TTFT。适合作为自己的压测设计参考：分别统计复制量、保留 payload、逻辑 charge、活跃读者引用和 RSS，并保留 sibling 冷访问回退。",
+      "sources": [
+        {
+          "name": "SMG #4732",
+          "url": "https://github.com/smg-project/smg/pull/4732"
+        }
+      ]
+    },
+    {
+      "title": "Mooncake EFA：忙重试要同时看真实经过的时间",
+      "summary": "#4956 于 10-28 14:23 合并。连续 1024 次 FI_EAGAIN 可能在几微秒内耗尽旧计数；新增 MC_EFA_STALL_MIN_MS 墙钟下限，默认 1000ms，<=0 恢复旧行为。",
+      "judgment": "应区分流控忙、连接首次完成尚未到达与 peer 真失活。作者在 2×p6-b200、特定 libfabric 环境验证，不能把该阈值当所有 EFA 网络的最佳值，也不要只放大 CQ timeout 代替生命周期排查。",
+      "sources": [
+        {
+          "name": "Mooncake #4956",
+          "url": "https://github.com/kvcache-ai/Mooncake/pull/4956"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "Google 10-28 发布 LiteRT in Google Play services 的 CompiledModel GPU 路径，通过共享运行时分发与更新。官方称相较 legacy GPU delegate 约 1.4 倍性能、应用体积约减少 8MB；NPU 支持仍在开发，NNAPI 将自 2027 年起移除。",
+    "judgment": "端侧推理竞争从单个 kernel 扩展到运行时分发、设备覆盖与升级治理。供应商平均性能不能替代目标手机验证；应记录系统服务版本、GPU/CPU 回退、冷启动和离线可用性，避免自动更新破坏可复现性。",
+    "sources": [
+      {
+        "name": "Google LiteRT Play services",
+        "url": "https://developers.googleblog.com/smaller-apps-and-faster-gpu-inference-with-litert-in-google-play-services/"
+      }
+    ]
+  },
+  "actions": [
+    "升级 SMG 前显式记录 parser 配置；按模型验证工具调用、reasoning、流式终止和 x-smg-parser，准备 legacy 回退。",
+    "worker 媒体复用覆盖身份不匹配、取消、五秒等待超时及 TP 广播；分别验证 GLM 与 MiniMax，勿把 DeepSeek 列入支持矩阵。",
+    "对异步 KV 加载构造 forward 与传输交叠压力，检查 buffer 重用、等待事件和逐 token 正确性，再评估吞吐。",
+    "冷 L1 压测同时包含长历史冷填充、短会话、重试和独立 sibling；不要将复制量缩减换算为 GPU 加速比。",
+    "升级 Kubernetes CEL 相关 Go 依赖时核对模块路径、编译兼容和成本预算；审计修复先确认上游合并状态，避免重复补丁。"
+  ]
+}
