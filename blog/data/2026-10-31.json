@@ -1,0 +1,106 @@
+{
+  "date": "2026-10-31",
+  "title": "mesh 索引限额进入验证，KV 无法重建时应明确失败",
+  "deck": "SMG 为缓存索引补计量与淘汰边界；SGLang 修正不可安全恢复的请求，vLLM 对齐空步 collective，Kubernetes 保留已持久化的设备分配。本期以近 24–48 小时一手材料为主，严格区分修复候选、主线合并、作者测试与正式发布。",
+  "top_items": [
+    {
+      "title": "SMG：mesh 内存修复候选不等于修复收敛",
+      "summary": "10 月 30 日新开的 #4761 是昨日 #4751 的实质后续，截至核验仍 open、未合并。它为字符串与 token 索引分别按条目数及存储量计量，单位分别为 UTF-8 字节和 token 数，用两代写入数据优先保留近期条目。限额在 eviction tick 执行后成立，期间仍可超限，也不约束进程 RSS、分配器或树内存。作者修订版 mock 测试的单网关末态 allocated heap 从 462 MiB 降至 16 MiB，但 #4752 全树修复协议未改，双网关 repair give-up 仍为 5 次。",
+      "judgment": "应把索引内存、repair 流量与收敛分别验收；预算不足时淘汰会增加修复请求。不要把 peer-update resolution 当作后端 KV 命中率，更不能将候选修复写成线上问题已解决。",
+      "sources": [
+        {
+          "name": "SMG #4761：候选修复与验证边界",
+          "url": "https://github.com/smg-project/smg/pull/4761"
+        }
+      ]
+    },
+    {
+      "title": "SGLang：无法完整重建 KV 的 retract 请求改为中止",
+      "summary": "#47521 于 10 月 30 日 23:19 UTC 合并。PD decode rebootstrap 仅携带 token IDs，不能重建 multimodal、input_embeds 与 positional_embed_overrides 的完整 KV，相关请求现在中止，pause_generation 路径返回 503。非分离 local re-prefill 能恢复多模态与位置覆盖，但 input_embeds 已向下游发送输出后重启生成也会中止，避免拼接错误。priority preemption 的 input_embeds 路径未改。",
+      "judgment": "恢复协议必须携带足够输入状态并考虑已发送输出。明确失败比返回貌似成功的错误结果更安全；客户端应区分流式部分输出后的中止与未输出前可重试，不宣称该合并已完成所有 GPU 组合验证。",
+      "sources": [
+        {
+          "name": "SGLang #47521",
+          "url": "https://github.com/sgl-project/sglang/pull/47521"
+        }
+      ]
+    },
+    {
+      "title": "vLLM：offline DP 的空 forward 步也要匹配 collective",
+      "summary": "#64457 于 10 月 30 日 23:07 UTC 合并。in-process LLMEngine 的 offline DP 加异步调度中，一个 rank 没有 forward 时可能提前进入 has_unfinished_dp all-reduce，与其他 rank 的 forward 同步错序。修复让未 forward 的 step 执行 dummy batch，并移除 V1 external_launcher 的重复同步特例。作者在 GB200、Qwen3-0.6B、DP2 的不均衡请求复现中，基线挂起而修订版完成；不涉及 multiprocess 客户端及另行报告的 ray/mp 问题。",
+      "judgment": "多卡稳定性测试必须包含不等请求数、不同输出长度、零 token step 和某 rank 提前完成；均匀满载跑通不足以证明 collective 顺序正确。",
+      "sources": [
+        {
+          "name": "vLLM #64457",
+          "url": "https://github.com/vllm-project/vllm/pull/64457"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "SMG 的 #4758 → #4759 → #4760 在 10 月 30 日形成 SGLang Encode/Prefill 的 draft 实现链：typed handoff、encoder gRPC transport、共享 deadline 的并发协调，用以避免 encoder 等待 prefill registration 时的顺序依赖。三项仍 open draft，尚未接入完整 EncodeStage；接收端仍有 UNIMPLEMENTED，不能称为已可用的 EPD 路由。已检查 SMG 近期 PR、合并、重要 Issue 与 Releases，最新公开 release 仍为 10 月 15 日 v1.13.0，本窗口没有新公开 release。",
+    "judgment": "EPD 的关键是媒体切片与 attempt 身份、注册先后、deadline 和取消传播的闭环。回环测试中 drop 本地 sibling future 不证明远端计算已释放；上线结论仍需真实 GPU 与取消确认测试。",
+    "sources": [
+      {
+        "name": "SMG #4758：typed handoff",
+        "url": "https://github.com/smg-project/smg/pull/4758"
+      },
+      {
+        "name": "SMG #4759：encoder transport",
+        "url": "https://github.com/smg-project/smg/pull/4759"
+      },
+      {
+        "name": "SMG #4760：并发协调",
+        "url": "https://github.com/smg-project/smg/pull/4760"
+      },
+      {
+        "name": "SMG Releases",
+        "url": "https://github.com/smg-project/smg/releases"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Kubernetes #143450 于 10 月 30 日 19:47 UTC 合并：DRA PreBind 已写入 ResourceClaim allocation 后再失败，Unreserve 不再用旧 informer 副本抹掉 assume cache 中的分配，避免设备看似空闲而被重复分配；只 assume API server 实际返回的 claim。PR 明确这是 v1.37 回归，release-1.36 及更早不受影响，尚不能称补丁版已发布。Rust 前端方面，SGLang #47160 当日合并，允许 HTTP layer 注入 RequestStart，让 native /generate 返回的 E2E 与首 token 计时覆盖前置解析；未插入扩展则不变，Prometheus histograms、gRPC、OpenAI routes 与 decode latency 不变。",
+    "judgment": "Go 调度器故障注入应覆盖部分持久化成功后失败，回滚不能简单恢复旧缓存。Python/Rust 前端对比则先对齐计时起点与指标通道，避免把漏计前处理当性能收益。",
+    "sources": [
+      {
+        "name": "Kubernetes #143450：DRA 分配回滚",
+        "url": "https://github.com/kubernetes/kubernetes/pull/143450"
+      },
+      {
+        "name": "SGLang #47160：Rust 原生接口计时",
+        "url": "https://github.com/sgl-project/sglang/pull/47160"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "CUDA graph 生命周期验证器：正确输出之外还要验证 buffer 存活",
+      "summary": "SGLang #46721 于 10 月 30 日 23:04 UTC 合并。工具分别执行 eager、原命令与 instrumented 运行，以 graph kernel operands 和 allocator 历史检查 graph 存活期间 buffer 是否被释放，并分别报告 lifetime、numerical 与 coverage。作者 GB300/H200 证据覆盖指定 Qwen1.5-MoE+LoRA TP1/TP2 配置，不代表所有模型后端安全；工具依赖私有 allocator/CUDA inspection API。",
+      "judgment": "这是测试能力而非生产路径提速。启用多 graph 优化前，应在目标模型、后端和并行配置上核对所有 worker 的 replay 覆盖，不能只凭一次生成结果正确。",
+      "sources": [
+        {
+          "name": "SGLang #46721",
+          "url": "https://github.com/sgl-project/sglang/pull/46721"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "SkyPilot 10 月 29 日官方文章将 Grace Blackwell 的调度重点放在机架拓扑、故障域与可调度容量，介绍 rack-local placement、每架 16 节点 slice 加 2 个备用节点及碎片整理。文中引用给定不可用率下的模型结果：16 节点 slice 相比 18 节点可用容量更高；这不是推理吞吐实测，文章中的训练对照也不能外推为通用推理收益。",
+    "judgment": "基础设施竞争不能只看采购 GPU 总数。备用节点、拓扑约束和可重启任务的恢复成本共同决定有效产出；是否值得保留 spare，需用自身故障率与负载测算，不构成投资建议。",
+    "sources": [
+      {
+        "name": "SkyPilot：Grace Blackwell 调度实践",
+        "url": "https://skypilot.ai/blog/grace-blackwell-needs-a-new-scheduler"
+      }
+    ]
+  },
+  "actions": [
+    "对 mesh 修复候选同时记录 eviction 前后索引大小、RSS、repair 请求/重试/give-up；分别验证预算可容纳和不可容纳工作集，不将限额误当即时硬上限。",
+    "为 retract/rebootstrap 建立多模态、input_embeds、位置覆盖与已发送部分输出的矩阵，确认显式中止、503 与客户端重试边界，避免拼接旧输出。",
+    "给 offline DP 添加 rank 不均衡、空 forward 和提前完成用例，核对所有参与者 collective 顺序；不要用 multiprocess 测试替代此次 in-process 路径。",
+    "在 DRA 验证中注入 PreBind 部分成功后的失败，检查 API 持久状态与 assume cache 一致；按实际 Kubernetes 版本确认是否受影响。",
+    "对 Rust 前端和 CUDA graph 的性能验收，分别确认计时口径、生命周期与覆盖率，再讨论吞吐收益；EPD draft 暂列观察项，不作为可部署功能。"
+  ]
+}
