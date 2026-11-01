@@ -1,0 +1,110 @@
+{
+  "date": "2026-11-01",
+  "title": "PD 路由要对齐 rendezvous，KV 页复用须等待旧计算结束",
+  "deck": "SMG 的 HTTP DP 路由出现 room 与 rank 不一致修复候选；SGLang 收紧 KV 目的地址发布时序，vLLM 将长提示词哈希移到 Rust 前端。关注近 24–48 小时一手进展，区分候选、主线合并、作者验证与正式发布。",
+  "top_items": [
+    {
+      "title": "SMG：HTTP PD 的 bootstrap room 需要服从已选 prefill rank",
+      "summary": "#4772 于 11 月 1 日 00:09 UTC 创建，目前 open、未合并。作者在 SGLang v0.5.22、dp4 prefill 与 --dp-aware 组合下报告 follow_bootstrap_room conflict：网关随机 room 与选定 rank 不一致。候选改为先选 rank，再在有效 rank、dp_size > 1 时生成满足 room % dp_size == rank 的 room，单请求与 batch 均覆盖，其他情况保持原行为。已有 stub/单元测试，但此构建尚未验证真实 SGLang PD 部署。",
+      "judgment": "路由字段、会合标识与引擎默认放置策略必须一致，不能只看网关选中了哪个 rank。先核对版本与配置，再做 live PD 回归；不能将候选写成问题已解决。",
+      "sources": [
+        {
+          "name": "SMG #4772",
+          "url": "https://github.com/smg-project/smg/pull/4772"
+        }
+      ]
+    },
+    {
+      "title": "SGLang：发布新 KV 写入目的地前，先等旧 forward 完成",
+      "summary": "#46373 于 10 月 31 日 23:13 UTC 合并。decode 复用已完成请求的 KV 页时，旧 forward 可能仍在写；过早向 prefill 发布新目的地址会产生覆盖。修复用 forward-stream event 和跨 rank MIN 一致性检查延后 device metadata 发布，并处理取消、失败 receiver 与 rebootstrap 提交顺序。作者在 GB300 本地 Mooncake TCP、NIXL/UCX 等配置验证 token parity、取消和恢复；本地测试不覆盖 RDMA，完整准确率与性能基准未做。",
+      "judgment": "页已分配或请求逻辑完成，不等于设备写入已停止。回归要组合页复用、overlap、取消和异构 TP，分别证明地址发布、传输与回收的先后关系。",
+      "sources": [
+        {
+          "name": "SGLang #46373",
+          "url": "https://github.com/sgl-project/sglang/pull/46373"
+        }
+      ]
+    },
+    {
+      "title": "vLLM：Rust 前端预计算 prompt block hashes，减少 GIL 干扰",
+      "summary": "#63842 于 10 月 31 日 19:38 UTC 合并，为 sha256/sha256_cbor 的普通、LoRA、cache-salt 与 lookahead 请求在 Rust 前端生成与引擎字节一致的哈希；多模态、prompt-embeds、xxhash 等仍回退引擎。作者 GB300/Qwen3-0.6B 混合负载中，64 路 decode 同时接纳 20 req/s 的已缓存 30K-token 请求，sha256 与 sha256_cbor 场景的 decode 吞吐分别提升 9.6% 和 39%；这是两轮交错测试的特定场景，不代表大模型普遍收益，Python 前端尚未发送哈希。",
+      "judgment": "高缓存命中仍可能被 CPU 接纳路径拖慢。测量应同时看长 prompt 到达率、hash 算法、ITL 与缓存语义，不能把 Rust 微观收益直接折算成集群容量。",
+      "sources": [
+        {
+          "name": "vLLM #63842",
+          "url": "https://github.com/vllm-project/vllm/pull/63842"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "SGLang #47557 于 10 月 31 日合并：HiCache 的 cgroup 主存预算不再因任一后代设置 memory.min 就取消全部 page-cache credit，而仅扣除直接子组受保护字节，按 min(memory.min, memory.current) 累加；读取失败或格式错误仍保守取消 credit。SMG #4741 同日合并，在注册时拒绝无括号 IPv6 的 tcp:// worker URL，保留 tcp://[fd00::5]:31000 形式，避免按最后一个冒号猜出不可用的数据面地址。已检查 SMG 近期 PR、合并、重要 Issue 与 Releases；最新公开 release 仍为 10 月 15 日 v1.13.0，以上主线合并不等于已发布版本。",
+    "judgment": "容量预算与地址校验都应尊重实际边界：可回收页缓存不等于随时可用内存，注册成功也应避免交付歧义地址。HiCache 变更没有提供吞吐收益证据，仍需在实际 Pod/cgroup 层级下核对。",
+    "sources": [
+      {
+        "name": "SGLang #47557",
+        "url": "https://github.com/sgl-project/sglang/pull/47557"
+      },
+      {
+        "name": "SMG #4741",
+        "url": "https://github.com/smg-project/smg/pull/4741"
+      },
+      {
+        "name": "SMG Releases",
+        "url": "https://github.com/smg-project/smg/releases"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Kubernetes #142429 于 10 月 31 日 06:37 UTC 合并：waitingPod.stopWithStatus 原先持读锁写 done，Reject 与 Preempt 并发时可能都返回成功；改为写锁，并用八 goroutine 并发停止与 Go -race 回归验证。Rust 依赖方面，SMG #4763 同日仅更新 Cargo.lock，将 Wasmtime/WASI 49.0.4 升至 49.0.5；作者报告修复四项 RUSTSEC 告警、cargo audit 清零，但本地未构建 WASI guest fixtures，相关集成目标实际未跑测试。",
+    "judgment": "Go 并发测试要验证唯一成功者，而不只是没有崩溃。Rust 审计清零与实际 WASM guest 兼容性是两件事；重建部署产物并补 guest 集成覆盖，不把锁文件变更说成所有运行路径已验证。",
+    "sources": [
+      {
+        "name": "Kubernetes #142429",
+        "url": "https://github.com/kubernetes/kubernetes/pull/142429"
+      },
+      {
+        "name": "SMG #4763",
+        "url": "https://github.com/smg-project/smg/pull/4763"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "OpenTelemetry OBI 1.0：稳定的是升级契约，不是全部遥测语义冻结",
+      "summary": "官方 10 月 30 日宣布 eBPF Instrumentation v1.0.0，以 Config v2、部署接口与兼容承诺为基础，为 Linux 应用提供免改源码的指标与 traces。HTTP/2、gRPC 和 AI 依赖覆盖继续扩展；runtime metrics 仍 experimental，详细 payload 提取需显式启用，Collector receiver 仍有独立 v0 发布线。",
+      "judgment": "适合用作网关到后端的观测补充，但升级需 canary 比对指标、属性与路由基数。默认不采集 prompt/body；明确数据边界后再考虑 payload capture，不能把零代码当成零权限或零风险。",
+      "sources": [
+        {
+          "name": "OBI 1.0 官方公告",
+          "url": "https://opentelemetry.io/blog/2026/obi-v1-release/"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "Google Cloud 10 月 30 日的基础设施月度回顾，将 agent 执行沙箱、治理与跨云加速器供给放在同一叙事中。需要区分回顾日期和原始事件：Agent Compute Engine 的原公告为 10 月 22 日，preview 尚待未来数月；Oracle 引入 Google TPU 的原公告为 10 月 27 日，计划 2027 年可用。不是本日新上线服务，也不代表当前即可采购的容量。",
+    "judgment": "产业竞争正从单一模型吞吐扩展到执行隔离、治理与供给选择，这是对厂商布局的判断。方案评估仍需落实实际可用地区、预览限制、价格与退出成本；公告不能替代 TCO 和交付验证，不构成投资建议。",
+    "sources": [
+      {
+        "name": "Google Cloud 10 月基础设施回顾",
+        "url": "https://cloud.google.com/blog/topics/ai-infrastructure/whats-new-in-ai-infrastructure-this-month"
+      },
+      {
+        "name": "Agent Compute Engine 原始公告",
+        "url": "https://cloud.google.com/blog/topics/ai-infrastructure/introducing-agent-compute-engine-and-expanded-agent-governance"
+      },
+      {
+        "name": "Oracle TPU 原始公告",
+        "url": "https://www.googlecloudpresscorner.com/2026-10-27-Oracle-Brings-Google-TPUs-to-Oracle-Cloud-Infrastructure"
+      }
+    ]
+  },
+  "actions": [
+    "检查 HTTP PD 的 selected prefill rank、bootstrap room 余数和 SGLang load_balance_method 是否一致，候选修复先用单请求/batch 与实际多 rank 部署验证。",
+    "为 KV 页复用补 overlap、取消、staging、异构 TP 与失败 receiver 的组合回归；将本地 TCP/NIXL 验证和跨节点 RDMA 验证分开记录。",
+    "压测高命中长 prompt 接纳对 decode ITL 的影响，并校验 LoRA、salt、lookahead 的哈希一致性与不支持场景回退。",
+    "核对 HiCache 的 cgroup 层级与 memory.min，给 Go 停止/抢占路径加唯一成功者断言；Wasmtime 更新后补实际 guest 集成测试。",
+    "观测系统先做配置迁移和 canary 遥测比对，详细 payload 保持显式授权；云服务月报中的未来计划不要误计为现有容量。"
+  ]
+}
