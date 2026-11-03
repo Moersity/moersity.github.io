@@ -1,0 +1,98 @@
+{
+  "date": "2026-11-03",
+  "title": "长提示词不能静默截断，KV 容量对齐应限制在真正需要的路径",
+  "deck": "SMG 发布 v1.14.0-rc.1 候选并继续修正主线语义；vLLM 将 RDMA 对齐从块数裁剪改为段布局补齐，外部缓存写入补上查询状态更新。区分预发布、后续主线合并、作者测试与实际部署。",
+  "top_items": [
+    {
+      "title": "SMG：tokenizer 文件里的截断与补齐不应悄悄改变服务输入",
+      "summary": "#4830 于 11 月 2 日 17:16 UTC 合并，加载文件时清除 truncation/padding，再选择编码路径；调用者直接提供的 tokenizer 对象仍保留原配置。作者报告某 max_length=8196 文件把 64 KB 提示词截为 8196 个 ID，修复后返回与引擎一致的 16512 个。60 个参考用例中 58 个一致，另 2 个既有 byte-fallback 差异保留；大规模 fixture 仍有已列明差异，不是全模型完美一致。",
+      "judgment": "先验收完整输入与引擎 token 序列一致，再看性能。修正静默截断后，长请求的真实计算量、KV 占用和限流计量都会增加，不能将过去截短输入的低延迟作为正确基线。",
+      "sources": [
+        {
+          "name": "smg-project/smg #4830",
+          "url": "https://github.com/smg-project/smg/pull/4830"
+        }
+      ]
+    },
+    {
+      "title": "vLLM：扩展 KV 缓存按段补齐，不再为所有连接器裁掉块数",
+      "summary": "#65225 于 11 月 3 日 00:56 UTC 合并。仅对注册设备 KV 内存的 RDMA 连接器补齐 segment placement 并做 defragmenting commit；CPU offload 保留测得容量。作者在 GB200/SmolLM2 小内存复现中，原先 102 块被向下取整为 0 而启动失败，修复后可启动并生成正确输出；另一个配置从 1024 块恢复为 1331 块。NIXL 1P1D 两种布局测试通过，但判定仍是连接器名称白名单，自定义注册内存的连接器须单独核对。",
+      "judgment": "对齐约束应落在实际内存注册边界，不能把 RDMA 需要的条件施加给所有 offload 路径。容量、虚拟地址补齐和物理提交分别计量，不能把多出的块数直接换算成吞吐收益。",
+      "sources": [
+        {
+          "name": "vllm-project/vllm #65225",
+          "url": "https://github.com/vllm-project/vllm/pull/65225"
+        }
+      ]
+    },
+    {
+      "title": "vLLM：本实例成功写入外部 KV 后，旧 miss 不能继续覆盖它",
+      "summary": "#64444 于 11 月 2 日 18:55 UTC 合并，文件系统或对象存储 tier 写入成功后将 key 发布为 present，更新缓存 miss，并阻止更早的 pending/in-flight probe 覆盖写入结果，同时保留跨请求 miss 复用。作者报告 102 项测试通过、11 项跳过；其他实例向共享存储写入仍不在范围内，不能声称共享存储一致性已全面解决。",
+      "judgment": "分层 KV 既要保证数据写成功，也要处理查询缓存和异步探测的先后关系。回归应覆盖先 miss、后 store、旧 probe 最后返回，并把本地写与远端写分开验证。",
+      "sources": [
+        {
+          "name": "vllm-project/vllm #64444",
+          "url": "https://github.com/vllm-project/vllm/pull/64444"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "SMG 已检查近期 PR、合并、重要 Issue 与 Releases：v1.14.0-rc.1 于 11 月 2 日 09:43 UTC 发布，标记为 prerelease，说明尚无该版本 engine images；稳定版仍为 v1.13.0。当天较晚及次日的主线修复不能直接归入这个 RC。#4896 于 11 月 3 日 00:34 UTC 合并，修复两个单独通过的 Responses 状态变更组合后，让 Harmony 被截断的 function call item 为 incomplete、响应却为 completed 的回归；统一状态读取后，作者 scoped 测试从 225 通过/2 失败变成 227 通过。",
+    "judgment": "发布验收要固定实际 tag、镜像与依赖，不把主线进展混入 RC。并发合并的正确性不能仅靠各自分支绿色 CI，流式终止事件、存储对象与后续读取应做同一状态契约的组合回归。",
+    "sources": [
+      {
+        "name": "SMG v1.14.0-rc.1",
+        "url": "https://github.com/smg-project/smg/releases/tag/v1.14.0-rc.1"
+      },
+      {
+        "name": "smg-project/smg #4896",
+        "url": "https://github.com/smg-project/smg/pull/4896"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Kubernetes #143290 于 11 月 2 日 22:51 UTC 合并，为 client-go workqueue 增加可选 Pausable：暂停时 Get 阻塞，Add、Done、Forget 继续工作；暂停中关闭则退出而不继续派发剩余项。这是 leader-election write gate 的出队暂停原语，不代表已取消在途工作。Rust 方面，SMG #4891 同日合并，将两个大型可选 prost 消息装箱，保持 wire 编码，dispatch future 的分配器档位从 7168 B 降为 5120 B，即每个文本请求少请求 2 KiB 内存。",
+    "judgment": "Go 控制器暂停要分清停止领取和停止执行。Rust async 布局优化要用实际分配尺寸验证；该 mock 测试的指令数基本持平、RSS 无明确降幅，多模态有额外消息分配，不能宣称通用吞吐提升。",
+    "sources": [
+      {
+        "name": "kubernetes/kubernetes #143290",
+        "url": "https://github.com/kubernetes/kubernetes/pull/143290"
+      },
+      {
+        "name": "smg-project/smg #4891",
+        "url": "https://github.com/smg-project/smg/pull/4891"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "SGLang 到 Mooncake 的请求追踪：先明确覆盖哪些 RPC",
+      "summary": "#37976 于 11 月 2 日 11:14 UTC 合并，在 HiCache 的 read/query 路径通过 extra_info 传递 request_id，由 Mooncake context 附加到 RPC，并在使用后清理以避免串请求。最终实现未覆盖 batch_set 写回路径；旧 Mooncake wheel 缺少 context binding 时静默 no-op，不是完整读写链路自动可观测。",
+      "judgment": "可用于定位缓存查询与读取延迟，但验收应逐项确认 wheel 能力、请求关联与 context 清理。没有 trace 可能是版本能力或未覆盖路径，不能直接当作没有存储 I/O。",
+      "sources": [
+        {
+          "name": "sgl-project/sglang #37976",
+          "url": "https://github.com/sgl-project/sglang/pull/37976"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "CrowdStrike 与 Dell 于 11 月 2 日宣布为 Dell AI Factory with NVIDIA 提供集成安全方案，企业可将基础设施与安全方案一起采购。公告称 NVIDIA OpenShell runtime 已集成，而 NVIDIA Sentry 与 BlueField-4 DPU 集成仍是计划。厂商未在该公告提供独立安全效果、运行开销或 TCO 实测。",
+    "judgment": "企业 AI 基础设施采购正把运行时隔离、观测与运维支持纳入交付方案，这是对产品布局的判断。选型仍需核对权限边界、遥测开销、故障责任和实际可用组件，不能把合作公告当作安全保证或投资结论。",
+    "sources": [
+      {
+        "name": "CrowdStrike / Dell 官方公告",
+        "url": "https://www.crowdstrike.com/en-us/press-releases/crowdstrike-dell-technologies-announce-integrated-ai-security-dell-ai-factory-nvidia/"
+      }
+    ]
+  },
+  "actions": [
+    "为 tokenizer 文件含 truncation/padding 的模型加入长输入序列对照，修正后重新检查上下文限制、token 计量与容量预算。",
+    "清点 KV connector 是否真正注册设备内存；自定义连接器确认白名单与单 segment 物理连续性，不盲套 CPU offload 的行为。",
+    "给外部 KV lookup 增加旧 miss/probe 与成功 store 的竞态测试，单独说明跨实例可见性边界。",
+    "对 Responses 的终止事件、存储对象和 GET 结果做组合回归；升级清单固定 RC tag 和实际可用镜像，不混用后续主线修复。",
+    "验收队列暂停与请求追踪时分别检查在途任务、未覆盖写回和旧 wheel no-op，避免仅凭零流量或缺少 span 判断系统已静止。"
+  ]
+}
