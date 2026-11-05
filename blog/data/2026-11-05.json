@@ -1,0 +1,114 @@
+{
+  "date": "2026-11-05",
+  "title": "实测 Prefill 容量先对齐计时口径，KV 恢复必须遵守真实布局",
+  "deck": "SMG 将实测输入容量扩展到多引擎，但引擎时钟与 servicer 时钟不能直接等同；vLLM 修复分头 KV 拷贝，Go JSON v2 与 Kubernetes 配额重试强调兼容性和拒绝语义。区分主线合并、正式发布、作者测试与部署事实。",
+  "top_items": [
+    {
+      "title": "SMG：多引擎实测 Prefill 容量落地，混合池要先核对测量边界",
+      "summary": "#5055 于 11 月 4 日 18:26 UTC 合并，用 vLLM 实际计算输入 token 除以引擎 scheduled-to-first-output 区间的并集，供 Prefill 等待时间评分；需要 log_stats。#5081 于 11 月 5 日 00:32 UTC 合并，为 Rust SGLang/TokenSpeed 接入负载记账与实测容量，但使用无排队、单 choice 请求的 submit-to-first-output 时间，包含通信、调度等待，PD 场景还包含 bootstrap 与 KV 传输。",
+      "judgment": "两种口径都不是 GPU kernel 时间，后者可能把传输成本混入输入处理速率。先在两种 prompt 长度的真实 prefill-role worker 上对照；当前仍欠引擎验证，不能将合并当作吞吐收益证明。",
+      "sources": [
+        {
+          "name": "SMG #5055：vLLM 实测输入容量",
+          "url": "https://github.com/smg-project/smg/pull/5055"
+        },
+        {
+          "name": "SMG #5081：SGLang / TokenSpeed 负载与容量",
+          "url": "https://github.com/smg-project/smg/pull/5081"
+        }
+      ]
+    },
+    {
+      "title": "vLLM：UMBP 不再把每层 KV 页一律当成连续内存",
+      "summary": "#64677 于 11 月 4 日 23:55 UTC 合并，按分配器 stride 将 LHBNC/BHLNC 拆成 per-head runs，修正初始化失败或静默恢复错误 KV；拆分页却缺少布局信息时改为启动失败。作者六布局 round-trip 测试由 4 失败变为 12 通过，并在 MI350X / Qwen3-0.6B 的 192-token 命中后验证 16 个 greedy token 与重算一致。",
+      "judgment": "缓存命中不能只看 hit 计数，还要与重算输出对照。新增每头拷贝范围的性能开销尚未 benchmark；AITER shuffle 的验证范围也不等同于完整 batch-invariance 矩阵。",
+      "sources": [
+        {
+          "name": "vLLM #64677：每种 KV 布局的分头拷贝",
+          "url": "https://github.com/vllm-project/vllm/pull/64677"
+        }
+      ]
+    },
+    {
+      "title": "Go 官方介绍稳定 JSON v2：迁移首先是协议语义变化",
+      "summary": "11 月 4 日官方文章说明 encoding/json/v2 与 encoding/json/jsontext 已在 Go 1.27 稳定可用，文章日期不等于 Go 1.27 发布日。默认拒绝无效 UTF-8 和重复成员名、大小写敏感匹配字段，nil slice/map 默认输出空数组/对象；jsontext 提供真正的流式处理。",
+      "judgment": "先回放真实 API 请求与响应，检查旧客户端对 null、字段大小写及重复 key 的依赖，再做性能测试。官方反序列化最高约 10 倍的 benchmark 是特定工作负载结果，不能套成网关整体提升。",
+      "sources": [
+        {
+          "name": "Go 官方：A new Go API for JSON",
+          "url": "https://go.dev/blog/jsonv2"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "已检查 SMG 近期 PR、合并、重要 Issue 与 Releases，最新正式版仍为 11 月 3 日发布的 v1.14.0。SMG 两项容量改动都在 v1.14.0 发布之后的主线，不视为已经进入该正式版。估计器保留最多 64 个样本、60 秒窗口，至少需要两个有效样本；SGLang/TokenSpeed 饱和 rank 没有空闲到达时可能不采样，旧值过期后走候选池实测均值或配置回退。#5081 同时补齐此前为零的排队 token 工作量、命中率与生成吞吐记账，Python servicer 不变。 新 Issue #5092 报告回放同时含 reasoning 与 reasoning_content 的 assistant 消息会触发重复字段错误，尚未关闭，需按报告复现而非视作所有调用都受影响。",
+    "judgment": "回归应包含冷启动、持续饱和、样本过期、统计关闭及 poll/push 一致性；未知容量与零容量须分开处理。混合池不要仅用一个吞吐字段掩盖不同引擎的计时边界。",
+    "sources": [
+      {
+        "name": "SMG #5055",
+        "url": "https://github.com/smg-project/smg/pull/5055"
+      },
+      {
+        "name": "SMG #5081",
+        "url": "https://github.com/smg-project/smg/pull/5081"
+      },
+      {
+        "name": "SMG v1.14.0",
+        "url": "https://github.com/smg-project/smg/releases/tag/v1.14.0"
+      },
+      {
+        "name": "SMG #5092：推理字段回放问题报告",
+        "url": "https://github.com/smg-project/smg/issues/5092"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Kubernetes #141905 于 11 月 4 日 19:33 UTC 合并，修复同一 admission batch 中另一 quota 状态更新冲突触发重试后，原先超额被拒的请求可能被重新放行的问题；在 waiter 重新解析前检查 IsDefaultDeny。尚未核验进入哪些发行补丁版。Go JSON v2 的变更也要求把协议兼容性测试放在序列化性能测试之前。 Rust 工具链方面，11 月 3 日发布的 rustup 1.29.3 修复部分不支持 SSE4.1 的 x86_64 CPU 上 Illegal instruction，以及 Solaris 的 lock() not supported；这是安装管理器补丁，不是 Rust 编译器版本。",
+    "judgment": "重试不能丢失先前已经确定的拒绝结果。为多 quota、并发 status conflict 的组合路径加回归，避免仅用单 quota 成功/超额用例证明 admission 安全。",
+    "sources": [
+      {
+        "name": "Kubernetes #141905：冲突重试保留配额拒绝",
+        "url": "https://github.com/kubernetes/kubernetes/pull/141905"
+      },
+      {
+        "name": "Go JSON v2 官方说明",
+        "url": "https://go.dev/blog/jsonv2"
+      },
+      {
+        "name": "Rust 官方：rustup 1.29.3",
+        "url": "https://blog.rust-lang.org/2026/11/03/Rustup-1.29.3/"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "SGLang：Mamba 边界快照必须拥有独立状态槽",
+      "summary": "#48328 于 11 月 5 日 00:08 UTC 合并，lazy boundary snapshot 先按 batch 缺口淘汰可回收树状态并分配新槽，不淘汰 locked 节点；仍无槽则跳过本次快照并保留原 checkpoint，避免把 keep slot 同时当旧状态和写目标。作者 GB300 TP2 / Qwen3-Next 多轮实验维持约 84% 命中率，指定 GPU 回归仍列为待跑，Extra CI 存在失败。",
+      "judgment": "这是状态所有权与正确性修复，不能宣称全矩阵验证或吞吐提升。压测应覆盖池耗尽、speculative crossing、无目标行及 overlap，确认失败只减少快照机会而不破坏既有状态。",
+      "sources": [
+        {
+          "name": "SGLang #48328：lazy Mamba 快照独立槽",
+          "url": "https://github.com/sgl-project/sglang/pull/48328"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "NVIDIA 11 月 3 日官方案例综述介绍半导体设计与制造中的加速计算：COMSOL、Applied Materials 使用 cuDSS，Siemens 正集成 cuLitho，Advantest 使用 NeMo Switchyard 做模型选择，Applied 使用 Omniverse 构建晶圆厂数字孪生。这是厂商案例汇总，不是 11 月 5 日新增合同、收入或产能披露。",
+    "judgment": "需求正从通用模型计算延伸到领域仿真和工程工作流，商业价值需要软件集成与可验证的业务结果支撑。厂商工作负载加速数据不等于独立验证的生产良率或财务回报，不据此推导投资收益。",
+    "sources": [
+      {
+        "name": "NVIDIA：AI 在半导体制造中的应用",
+        "url": "https://blogs.nvidia.com/blog/ai-semiconductor-fabs/"
+      }
+    ]
+  },
+  "actions": [
+    "混合引擎 Prefill 池分别记录引擎时钟与 servicer 时钟口径，在两种 prompt 长度及 PD 传输条件下对照容量估计，不直接横比单一吞吐字段。",
+    "给容量估计加入冷启动、饱和 60 秒后过期、统计关闭与缺失值回退测试，核对 poll 和 push 的同一 rank 结果。",
+    "对每种 KV 布局做写入、恢复、重算输出对照，再测 per-head bulk range 增多后的传输开销。",
+    "迁移 Go JSON v2 前回放 null、字段大小写、重复 key、无效 UTF-8 与自定义 marshal/unmarshal 用例；为 quota 冲突重试验证拒绝状态不丢失。",
+    "Mamba lazy cache 压满状态池并覆盖 speculative/overlap 异常出口，确认跳过新快照时旧 checkpoint 仍可安全复用。"
+  ]
+}
