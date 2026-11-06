@@ -1,0 +1,106 @@
+{
+  "date": "2026-11-06",
+  "title": "没有 Worker 也要报警，混合缓存预取不能随意截短",
+  "deck": "SMG 补上空序列与优先级调度告警盲区，SGLang 保护混合状态恢复边界，vLLM 缓存异步加载预留量以降低调度开销。主线合并、作者验证与正式发行保持区分。",
+  "top_items": [
+    {
+      "title": "SMG：没有 Worker 指标，不再被当成没有故障",
+      "summary": "#5202 与 #5203 于 11 月 6 日 00:38 UTC 合并。前者让 SmgNoHealthyWorker 在 gateway 抓取正常却没有任何 worker series 时也触发，覆盖从未注册及全部移除的场景；健康 worker 面板回退为 0。后者将 priority scheduler 的队列满、排队超时拒绝及分优先级 in-flight/queue 指标纳入 Helm 告警和面板，补上原先只看 legacy limiter 的盲区。",
+      "judgment": "告警回归必须包含指标消失、全部实例移除及调度器切换。新安装在首个引擎健康前可能经过配置的一分钟阈值就报警；区分部署预热与真正无可用容量，不应靠缺失序列静默。",
+      "sources": [
+        {
+          "name": "smg-project/smg #5202",
+          "url": "https://github.com/smg-project/smg/pull/5202"
+        },
+        {
+          "name": "smg-project/smg #5203",
+          "url": "https://github.com/smg-project/smg/pull/5203"
+        }
+      ]
+    },
+    {
+      "title": "SGLang：混合模型 L3 命中必须保留对应恢复边界",
+      "summary": "#48421 于 11 月 5 日 15:28 UTC 合并。带 SWA/Mamba 组件传输的 storage hit 要求完整 host 分配，不能在容量不足时将 KV 命中截为较短前缀，因为较短边界未必有对应窗口或 checkpoint。失败进入 host_capacity revoke 与重试；仅 full-attention 预取仍支持部分分配。CPU 隔离回归通过，完整 pytest、GPU 精度与 serving benchmark 尚未完成。",
+      "judgment": "缓存恢复单位是 KV 与关联状态的一致组合，不只是 token 数。测试应刻意让 host 只容纳部分命中，确认不提交缺失混合状态的传输，也不改写原命中及 hash。",
+      "sources": [
+        {
+          "name": "sgl-project/sglang #48421",
+          "url": "https://github.com/sgl-project/sglang/pull/48421"
+        }
+      ]
+    },
+    {
+      "title": "vLLM：异步 KV 预留量改为增量维护，避免反复扫描停放请求",
+      "summary": "#65285 于 11 月 5 日 21:25 UTC 合并，缓存 parked load 的块预留并维护总量，在 promotion 刷新、释放及 step 结束时回收，HiSparse 因依赖动态 host 空闲量而继续按需计算。作者 CPU mock 中 4096 个 parked load 再准入 8 个的单次 schedule 从 47.2 降至 5.44 ms，取共享节点五次最佳值；不是端到端吞吐指标。",
+      "judgment": "减少热路径扫描的前提是生命周期记账不失真。最终变更后 348 项生命周期测试通过；真实 connector 验证来自最终变更之前，广泛测试另有 77 个同样出现在基线的失败，不能表述为全套验证完成。",
+      "sources": [
+        {
+          "name": "vllm-project/vllm #65285",
+          "url": "https://github.com/vllm-project/vllm/pull/65285"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "已单独检查 SMG 近期 PR、合并、重要 Issue 和 Releases，最新正式版仍为 11 月 3 日 v1.14.0，本期改动是其后主线。昨日提到的 #5092 已由 #5178 于 11 月 5 日 18:28 UTC 合并修复：assistant 同时带 reasoning 与 reasoning_content 且文本相同可被接受；内容不同时报 invalid_value，重复同一 key 仍报 duplicate。wire format 与已发布 schema 不变，但 Rust 字段改为 reasoning: AssistantReasoning，并记为 breaking change。",
+    "judgment": "回放兼容修复不等于容忍所有重复字段。升级时同时验证单字段、双字段同值、双字段异值和重复同名 key；Rust 直接依赖方还要检查源码 API 迁移，不能只看 HTTP 请求恢复。",
+    "sources": [
+      {
+        "name": "smg-project/smg #5178",
+        "url": "https://github.com/smg-project/smg/pull/5178"
+      },
+      {
+        "name": "SMG v1.14.0",
+        "url": "https://github.com/smg-project/smg/releases/tag/v1.14.0"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Kubernetes #142763 于 11 月 5 日 07:49 UTC 合并，修复 graceful shutdown 的 watch 退出早于限速器安装的竞态。新增 WatchRequestsDraining 信号，使流程按停止接收新请求、开始 watch drain、在途请求排空排序，200 个 watch 的测试检查处理器退出时 waitgroup 已进入限速等待。尚未确认进入哪些补丁发行版。已检查 Go 与 Rust 官方博客，本次未重复昨日的 JSON v2 与 rustup 1.29.3；Rust 流式实现的新进展见下节。",
+    "judgment": "控制面滚动更新不仅要等待请求结束，还要控制客户端重连峰值。仅配置 shutdown grace period 不足以证明限速生效，应验证生命周期信号与 limiter 安装的先后关系。",
+    "sources": [
+      {
+        "name": "kubernetes/kubernetes #142763",
+        "url": "https://github.com/kubernetes/kubernetes/pull/142763"
+      },
+      {
+        "name": "Go 官方博客",
+        "url": "https://go.dev/blog/"
+      },
+      {
+        "name": "Rust 官方博客",
+        "url": "https://blog.rust-lang.org/"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "SMG Rust 流式响应：由 HTTP body 驱动读取，合并已经就绪的消息",
+      "summary": "#5176 于 11 月 5 日 14:35 UTC 合并，让响应 body 驱动 stream future，减少跨任务 channel 唤醒；chat 将同次 poll 已就绪消息合并至现有 16 KiB 边界，首 token 先交付，断连则 detach 继续 abort、usage 与 metrics 清理。作者 8-vCPU mock、250 req/s、128 delta、8 runtime threads 下 CPU 657→503 微秒/请求，分配 216.2→186.5 KiB，84/84 归一化输出相同。",
+      "judgment": "这是 CPU 与分配开销优化，不是首 token 加速：该 mock 的 TTFT p50 约 0.499→0.523 ms。验收保留慢客户端、断连与错误流用例，不能把消息合帧误变成定时等待，也不能把 mock 收益外推为 GPU 吞吐增幅。",
+      "sources": [
+        {
+          "name": "smg-project/smg #5176",
+          "url": "https://github.com/smg-project/smg/pull/5176"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "Qualcomm 11 月 4 日公布 FY2026 Q4/FY 全年结果：Q4 GAAP 营收 103.22 亿美元，同比下降 8%；重申 FY2027 Data Center 营收目标 50 亿美元，并披露与 Amazon 的多代 AI 数据中心产品合作。公司同时指出晶圆制造、封装、测试及内存等投入成本上升。50 亿是前瞻目标，不是已实现收入或当前市场份额。",
+    "judgment": "数据中心供应商多元化有新的公司披露支持，但采购仍需检查交付、编译器与算子支持、实际模型服务成本。收入目标与合作公告不能代替可用产品、TCO 实测或投资回报证据。",
+    "sources": [
+      {
+        "name": "Qualcomm FY2026 财报（SEC 原文）",
+        "url": "https://www.sec.gov/Archives/edgar/data/804328/000080432826000127/qcom092726erex991.htm"
+      }
+    ]
+  },
+  "actions": [
+    "用 promtool 覆盖从未注册 worker、最后一个 worker 被移除、gateway down 与存在健康 worker 四种场景；priority scheduler 开关两侧都验证 admission 告警。",
+    "混合模型 L3 预取压测加入 host 只容纳半段命中的场景，确认 SWA/Mamba 恢复边界、KV 和 hash 保持一致。",
+    "对异步 KV 预留缓存验证失败接收、无效块、promotion、abort 与 step-end，比较增量总量和逐请求重算结果。",
+    "回放 reasoning 双字段的同值/异值及重复 key 请求；直接依赖 SMG Rust 协议类型的代码检查 AssistantReasoning 迁移。",
+    "滚动更新 apiserver 时观察 watch 重连峰值；测试流式 body 的背压、首 token、断连清理和输出字节一致性，不只看 CPU 降幅。"
+  ]
+}
