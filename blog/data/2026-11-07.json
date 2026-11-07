@@ -1,0 +1,97 @@
+{
+  "date": "2026-11-07",
+  "title": "KV 事件要跟随角色策略，异构 P/D 传输必须对齐 token",
+  "deck": "SMG 修正角色策略与 KV 订阅错配，vLLM 用末 token 对齐异构块，SGLang 限制多模态排队副本显存。重点是路由真实生效、缓存内容正确与容量预算完整，而非把合并等同于吞吐提升。",
+  "top_items": [
+    {
+      "title": "SMG：KV 事件订阅跟随实际放置 Worker 的角色策略",
+      "summary": "#5259 于 11 月 6 日 21:33 UTC 合并。此前订阅依据模型策略名称，导致 --policy round_robin --prefill-policy cache_aware 等组合只收到 load，缓存路由静默退回近似 token tree。现在通过 policy_for_worker 与 needs_kv_events 能力决定 prefill/decode/encode 的订阅及 ZMQ 警告；角色与模型策略一致的部署不变。",
+      "judgment": "配置了 cache_aware 不代表事件索引真正工作。验收应覆盖默认策略、角色覆盖和 worker label 冲突，观察索引创建与事件到达；这项行为修复没有给出真实引擎吞吐收益。",
+      "sources": [
+        {
+          "name": "smg-project/smg #5259",
+          "url": "https://github.com/smg-project/smg/pull/5259"
+        }
+      ]
+    },
+    {
+      "title": "vLLM：不同 P/D block size 不再按列表位置猜 KV 对齐",
+      "summary": "#59746 于 11 月 6 日 19:16 UTC 合并，用 remote_num_tokens 确定末 token，从后向前配对 P/D 块，修复 decode 部分 prefix hit 或滑窗裁剪后错块及崩溃。不同逻辑 block size 的 DCP 在握手时拒绝，异构 pull 缺少 remote_num_tokens 则失败而非继续猜位置。同尺寸 P/D 不变。",
+      "judgment": "路由层必须完整转发传输元数据。作者 CPU 226 用例通过，其中 44 个在修复前失败；GB10 上有限模型组合 logprobs 与匹配块基线逐位一致，不构成所有布局或吞吐的保证。",
+      "sources": [
+        {
+          "name": "vllm-project/vllm #59746",
+          "url": "https://github.com/vllm-project/vllm/pull/59746"
+        }
+      ]
+    },
+    {
+      "title": "SGLang：多模态接收副本也必须有 GPU 与 host 预算",
+      "summary": "#48507 于 11 月 7 日 00:55 UTC 合并，为 cuda_vmm 接收时重建的多模态 feature 按每 rank SGLANG_MM_FEATURE_CACHE_MB 限额，默认 1 GiB；超额放 pinned host，避免深排队占用 KV 预算之外的显存。GPU 副本释放后等 CUDA event 确认可复用才撤销计费；host 份额考虑 cgroup、HiCache 预留与本机 rank，超限会拒绝请求。",
+      "judgment": "应同时量化排队图像字节、GPU 副本存活与 pinned host 压力。设置 SGLANG_MM_BUFFER_SIZE_MB 时未 hash item 的 staging 有限制；局部 NVIDIA 测试通过不等于无性能代价，尚无精度或速度 benchmark。",
+      "sources": [
+        {
+          "name": "sgl-project/sglang #48507",
+          "url": "https://github.com/sgl-project/sglang/pull/48507"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "SMG #5166 于 11 月 6 日 23:50 UTC 合并，Rust vLLM GetLoads 现在按请求中的 dp_rank 过滤负载。现有网关轮询本来就不指定 rank，因此这不是一次网关路由策略调整。连同今天的角色策略 KV 订阅修复，工程重点是控制面查询与数据面实际语义一致。已检查近期 PR、Release 和更新的 Issue；最新 Release 仍为 11 月 3 日 v1.14.0，上述改动均为 main 进展。近期 Issue 检查返回的 H100 runner 饥饿属于既有 CI 运维问题，未发现需要替代上述主线的新产品问题，不代表没有其他缺陷。",
+    "judgment": "上线前应按实际使用的 commit 或后续发行说明核对补丁，不能把已合并等同于 v1.14.0 已包含。负载查询要分别测试全局与指定 rank，避免把查询修复误记成调度收益。",
+    "sources": [
+      {
+        "name": "smg-project/smg #5166",
+        "url": "https://github.com/smg-project/smg/pull/5166"
+      },
+      {
+        "name": "SMG Releases",
+        "url": "https://github.com/smg-project/smg/releases"
+      },
+      {
+        "name": "SMG Issue #4960",
+        "url": "https://github.com/smg-project/smg/issues/4960"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Kubernetes #143849 于 11 月 6 日 17:27 UTC 合并：client-go 设置 MinConnectionPoolSize 时，选中的连接池成员无法连接服务器，改用另一个成员再尝试一次，并以时间惩罚短暂避开连接失败的后端。新增 beta feature gate ClientsAllowConnectionPoolFailureAvoidance，默认开启。此处是主线行为，尚未核验已纳入哪个正式发行版。",
+    "judgment": "连接失败不等于后端业务失败，不能扩大理解成任意 API 错误都会自动重放。控制面多后端测试需包含硬故障、快速拒绝连接与恢复，观察失败率和重试开销，而非只看连接池并发均衡。",
+    "sources": [
+      {
+        "name": "kubernetes/kubernetes #143849",
+        "url": "https://github.com/kubernetes/kubernetes/pull/143849"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "SMG logit_bias 端到端能力检查",
+      "summary": "#5101 于 11 月 6 日 23:51 UTC 合并，修复 chat/completions schema 接受 logit_bias、gRPC 下游却丢弃的问题。vLLM、SGLang、TokenSpeed 路径现传递该参数；校验 bias 在 [-100,100]、token ID 非负并满足词表或 embedding 边界。TRT-LLM 不支持时明确返回 400。",
+      "judgment": "适合当作网关兼容性测试模板：字段被接受只是第一步，还要验证后端效果、边界错误和不支持时的响应。作者记录了同一代码树的四引擎族 live 验证；无 bias 热路径 allocation 不变不能外推为吞吐提升。",
+      "sources": [
+        {
+          "name": "smg-project/smg #5101",
+          "url": "https://github.com/smg-project/smg/pull/5101"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "Cloudflare 11 月 5 日发布第三季度财报：营收 7.825 亿美元，同比增长 39%；GAAP 毛利率为 71.2%，上年同期为 74.0%；GAAP 运营亏损 6790 万美元，上年同期为 3750 万美元。这些是公司整体财务指标，不是独立 AI 推理业务收入。",
+    "judgment": "云平台增长与成本结构需要一起观察。收入扩张并未自动带来 GAAP 毛利率改善；评估推理基础设施商业化时应另找可验证的利用率、单位服务成本和产品收入，不能将公司整体增长归因于 AI。",
+    "sources": [
+      {
+        "name": "Cloudflare Q3 2026 财务公告",
+        "url": "https://www.cloudflare.com/press/press-releases/2026/cloudflare-announces-third-quarter-2026-financial-results/"
+      }
+    ]
+  },
+  "actions": [
+    "核对每个 prefill/decode/encode pool 的实际策略与 KV-event 订阅，测试模型默认、角色覆盖及 worker label 组合，确认索引真实建立。",
+    "异构 P/D block size 回归覆盖 decode 部分命中、滑窗裁剪、逻辑/内核块大小差异和 remote_num_tokens 缺失；检查网关转发链路。",
+    "图像深排队压测同时记录每 rank GPU feature 字节、未完成 CUDA event 与 pinned host 占用，并验证超 host 份额的失败行为。",
+    "client-go 连接池注入单后端硬故障与恢复，核对新 feature gate 和实际版本，不把连接重试扩展为通用业务请求重放。"
+  ]
+}
