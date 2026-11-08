@@ -1,0 +1,105 @@
+{
+  "date": "2026-11-08",
+  "title": "滚动重启要赢过旧版本，Runner 与 KV 布局升级必须显式验收",
+  "deck": "SMG 修复 mesh 重启后的旧规格传播，SGLang 为 draft KV 增加布局契约，vLLM 主线移除 Model Runner V1。今天的重点是升级兼容、分布式状态收敛与验证边界，而非将主线合并视作可直接投产。",
+  "top_items": [
+    {
+      "title": "SMG：重启后的 Worker 版本必须高于 peers 持有的旧版本",
+      "summary": "#5286 于 11 月 7 日 18:45 UTC 合并。同名 gateway 重启后会认领之前导入的 worker key，但进程内 revision 从零重启，原先发布的版本不足以覆盖 peers 的旧规格。修复将认领后的 revision 提到已见版本之上，迟到的更高旧版本也触发再次发布；单纯 health 变化不提升规格版本。",
+      "judgment": "滚动重启且修改模型时，应从每个 peer 读取最终 worker spec，不能只验注册成功。作者对 registry/worker-sync 的 134 个测试重复三轮及 7 个 mesh TLS startup 测试通过，这属于收敛语义验证，不是吞吐 benchmark。",
+      "sources": [
+        {
+          "name": "SMG #5286",
+          "url": "https://github.com/smg-project/smg/pull/5286"
+        }
+      ]
+    },
+    {
+      "title": "SGLang：draft KV 的算法与 entry 数进入 P/D 握手",
+      "summary": "#48375 于 11 月 7 日 09:30 UTC 合并。DSpark/DFLASH 将 main entries 中 draft KV 的算法和 num_draft_entries 通过 spec_kv_layout 发布，decode 在注册 prefill 目的端之前拒绝不兼容布局。draftless PP stage 可跳过；普通 PD、EAGLE、NEXTN 不因此增加限制。",
+      "judgment": "旧 decode 遇到携带新字段的 prefill 会拒绝，必须纳入滚动升级次序与混部测试。作者最终 head 的 221 个测试及 175 个 subtest 通过；此前 head 的 H200 四次普通 PD 请求成功，不能充当全套 draft 配置精度验证。",
+      "sources": [
+        {
+          "name": "SGLang #48375",
+          "url": "https://github.com/sgl-project/sglang/pull/48375"
+        }
+      ]
+    },
+    {
+      "title": "vLLM：主线删除 MRV1，旧回退路径不再可用",
+      "summary": "#63373 于 11 月 7 日 22:50 UTC 合并，删除 Model Runner V1 及其专属接口。VLLM_USE_V2_MODEL_RUNNER 设置为非 1 将启动失败，设为 1 会提示冗余；V1 logits processor API、custom_class speculation 等被移除。x86 CPU 路径需要 triton-cpu，非 x86 standalone CPU runner 保留；DBO 改走 MRV2。",
+      "judgment": "合并状态已核验，但 PR 正文仍保留 Draft/preview，并明确当前分支未完成 full CI 与 model evals。升级前盘点启动环境、定制插件、CPU 平台与推测解码配置；既有定向 GB200 测试不能覆盖全部删改，也不能当成正式发行声明。",
+      "sources": [
+        {
+          "name": "vLLM #63373",
+          "url": "https://github.com/vllm-project/vllm/pull/63373"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "SMG 本轮已检查近期合并、Release 与重要 Issue；正式版仍为 11 月 3 日 v1.14.0，今天的 mesh 修复与 benchmark 扩展属于后续主线。CI runner 饥饿旧 Issue #4960 于 11 月 7 日早间解除，#5308 当晚又报告容量不足；这是 CI 资源问题，不应称为产品功能回归。Go 与 Rust 官方博客首页最新条目仍分别为 11 月 4 日与 11 月 3 日，本期不重复旧公告，侧重 Rust 网关与 Go 云原生工程。",
+    "judgment": "合并、正式发行和特定硬件上的测试覆盖是三件事。升级门禁应保留所用 commit、后端与硬件组合及未覆盖项，CI 容量紧张时尤其不能把局部通过写成全套验证。",
+    "sources": [
+      {
+        "name": "SMG Releases",
+        "url": "https://github.com/smg-project/smg/releases"
+      },
+      {
+        "name": "SMG #5308",
+        "url": "https://github.com/smg-project/smg/issues/5308"
+      },
+      {
+        "name": "SMG #4960",
+        "url": "https://github.com/smg-project/smg/issues/4960"
+      },
+      {
+        "name": "Go Blog",
+        "url": "https://go.dev/blog/"
+      },
+      {
+        "name": "Rust Blog",
+        "url": "https://blog.rust-lang.org/"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Kubernetes #143816 于 11 月 7 日 19:25 UTC 合并，强化 DRA ResourceSlice 最大对象的集成测试，将对象大小预算与剩余空间变成断言，并集中记录限制依据。补齐 advanced case 的 bindingConditions 后，测试对象从 1,207,262 字节增至 1,371,102 字节，预算占比从 77% 增至 87%。",
+    "judgment": "这是测试与文档加强，不是新增运行时 API 限制。设备资源 schema 演进要测最大组合及 ManagedFields 开销，不能只看单字段上限或普通样本；剩余容量应在 CI 中提前失败，而非等 apiserver 拒绝生产对象。",
+    "sources": [
+      {
+        "name": "Kubernetes #143816",
+        "url": "https://github.com/kubernetes/kubernetes/pull/143816"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "SMG T6：按真实策略配置测路由延迟",
+      "summary": "#5264 于 11 月 7 日 07:53 UTC 合并，为 benchmark 增加 selection policy、temperature、decay、accounting、真实 load feed、近似 tree 和多线程等配置。这是测量工具扩展，不是运行时性能修复。作者在绑核 Genoa VM 的 128 个 worker、每个 8192 blocks 的配置中，默认 p99 重复测得 19.6 与 15.9 微秒，反映测量噪声。",
+      "judgment": "温度、记账与衰减会使配置退出 exact fast path，因此不能用默认配置的单次结果证明实际部署 SLO。按线上参数、线程数和负载输入重跑，报告重复测量与尾延迟，不只引用最快样本。",
+      "sources": [
+        {
+          "name": "SMG #5264",
+          "url": "https://github.com/smg-project/smg/pull/5264"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "TeraWulf 于 11 月 6 日提交的 10-Q 披露，第三季度 HPC lease revenue 为 6300 万美元，Lake Mariner 截至 9 月 30 日已投入营收运行的 critical IT capacity 为 102 MW。438 MW 合约容量按阶段交付，不能等同于已经运行的容量。该收入口径包含按原价转付的电费及 fit-out 服务，并非纯租金。",
+    "judgment": "观察 AI 基础设施应区分签约、交付、运行与收入确认。收入和容量也不能直接推出 GPU 利用率或推理需求；比较不同运营商时，先统一电费转付、装修服务和租赁收入的会计口径。",
+    "sources": [
+      {
+        "name": "TeraWulf 2026 Q3 Form 10-Q",
+        "url": "https://www.sec.gov/Archives/edgar/data/1083301/000162828026071671/wulf-20260930.htm"
+      }
+    ]
+  },
+  "actions": [
+    "滚动重启 mesh 并修改 worker model，验证所有 peer 最终规格一致，再注入迟到旧版本与 health-only 更新。",
+    "为 DSpark/DFLASH 建立新旧 prefill/decode、不同 draft entry 数和 draftless PP 的兼容矩阵，升级前验证拒绝行为。",
+    "检索部署脚本中的 VLLM_USE_V2_MODEL_RUNNER 与 V1 扩展接口，盘点 x86 CPU Triton 依赖及被删除的推测解码能力。",
+    "为 DRA 设备资源最大组合建立带 ManagedFields 的大小预算测试，追踪 schema 演进后的剩余空间。"
+  ]
+}
