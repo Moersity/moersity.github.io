@@ -1,0 +1,104 @@
+{
+  "date": "2026-11-10",
+  "title": "混合缓存路由减少逐 Worker 开销，PP 传输开始切换 copy engine",
+  "deck": "SMG 优化混合缓存 group view 的读取并补齐失效观测；vLLM 为单节点 PP 引入自动选择的 CUDA copy-engine 传输。性能收益须对应具体负载，健康检查与缓存规则的真实状态仍要独立验证。",
+  "top_items": [
+    {
+      "title": "SMG：混合缓存路由一次取表，避免逐 holder 加锁",
+      "summary": "#5571 于 11 月 9 日 22:08 UTC 合并，将 cache-group views 放入按 interned worker ID 索引的表。一次决策持有一次读锁，逐 holder 直接索引，减少此前 hash-map 查询、shard lock 和引用计数移动。",
+      "judgment": "作者 T6 绑单核、三轮交错测量中，128-worker 全 hybrid fleet 的 criterion mean 从 12.60 降至 10.12 微秒，plain fleet 从 7.97 到 7.95 微秒。不能把不同 fleet 的 13.9 与 8.0 微秒直接当作修复收益，也不能外推真实引擎吞吐。",
+      "sources": [
+        {
+          "name": "SMG #5571",
+          "url": "https://github.com/smg-project/smg/pull/5571"
+        }
+      ]
+    },
+    {
+      "title": "vLLM：PP activation 可用 CUDA copy engine 传递",
+      "summary": "#65896 于 11 月 10 日 00:09 UTC 合并。VLLM_PP_TRANSPORT 默认 auto，在所有 PP rank 都满足条件时选择 copy engine，否则回退 NCCL；强制 copy_engine 而不可用会启动失败。要求 CUDA、TP=1、PCP=1、单节点、全部 PP GPU 间 NVLink 及 64-bit stream memory operations。",
+      "judgment": "作者 GB300、单一 MiniMax-M3.1-Flash 模型测量中，100K cached prefix 加 1.5–10K 新 token 的接近饱和负载下 TTFT 中位数改善 13–20%，但部分负载 p99 上升。不能外推 H100/H200；输出一致性只比较到 8K prompt，长 prompt 未比对，sleep 释放 buffer 仍是后续工作。",
+      "sources": [
+        {
+          "name": "vLLM #65896",
+          "url": "https://github.com/vllm-project/vllm/pull/65896"
+        }
+      ]
+    },
+    {
+      "title": "SMG：group view 不完整时不再静默",
+      "summary": "#5568 于 11 月 9 日 22:10 UTC 合并。worker 在首个 main-attention store 重启 group view 时，多 main-signal group 或超出 mask 范围可能使 view 不完整、规则停用直到下次 clear。该路径现在记录 group_view_late 与 warn，等待路径同步刷新 group_dropped。",
+      "judgment": "这是观测补齐，没有修复导致规则停用的条件。告警出现后需核对 group 结构和 clear/rebuild 生命周期，不能把指标新增当作缓存正确性已恢复。PR 中测试总数仍为占位符，不引用未经确认的测试数量。",
+      "sources": [
+        {
+          "name": "SMG #5568",
+          "url": "https://github.com/smg-project/smg/pull/5568"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "SGLang #40962 于 11 月 9 日 21:44 UTC 合并，在 Adaptive EAGLE 构建 target graph 时退出 draft TP、MoE 与 A2A context，避免 target 继承 draft 设置，同时保留 worker-state override。其验证记录较弱：历史 CPU isolated AST 检查能够区分修复前后，历史 GPU backport 也不是当前 head；最终 factory 改动后本地未重跑 CPU/GPU。",
+    "judgment": "该项适合作为升级待验清单，不宜据合并状态直接投产。要在实际 target/draft 并行度与 MoE 配置下重跑图捕获和输出一致性；没有性能主张，也不能将历史 backport 测试当作最终 head 的验证。",
+    "sources": [
+      {
+        "name": "SGLang #40962",
+        "url": "https://github.com/sgl-project/sglang/pull/40962"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Kubernetes #141272 于 11 月 9 日 23:15 UTC 合并：externalTrafficPolicy: Local Service 被删除后，已在处理中的健康检查请求不再因 Go net/http 隐式响应而返回 200，而是按零 endpoint 路径返回 503。listener 和活动连接先关闭，随后删除 map entry，因此相关竞态窗口很窄。",
+    "judgment": "作者仅有单测证明语义缺口，明确没有实际复现证据，不能称为已经造成生产故障。删除与缩容测试应确认负载均衡器看到的状态码，避免将 handler 提前返回误当成显式拒绝。此处是主线合并，不代表已纳入某个正式补丁版本。",
+    "sources": [
+      {
+        "name": "Kubernetes #141272",
+        "url": "https://github.com/kubernetes/kubernetes/pull/141272"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "PP 传输的成对测量与一致性验收",
+      "summary": "vLLM #65896 的实验记录同时列出负载、TTFT p50/p99、配对请求差值以及 PP=2/4 的定向测试；传输选择在所有 rank 间统一，并测试一个 stage 初始化失败时，auto 整体回退、强制模式整体报错。",
+      "judgment": "值得借鉴的是方法而非单一提升百分比：按线上 prompt、并发和模型复测尾延迟，同时比较 tokens/logprobs 与显存占用。配对中位数改善与某个节点 p99 上升可以同时成立，需保留完整负载曲线。",
+      "sources": [
+        {
+          "name": "vLLM #65896 验证记录",
+          "url": "https://github.com/vllm-project/vllm/pull/65896"
+        }
+      ]
+    },
+    {
+      "title": "SMG 主线改动与正式版分开验收",
+      "summary": "本轮已检查 SMG 近期 PR、合并、Release 和重要 Issue，最新正式版仍为 11 月 3 日 v1.14.0；今天的 group-view 性能与观测改动属于后续主线。近期 GPU CI 排队事项是验证资源问题，未作为新的产品功能事件重复收录。",
+      "judgment": "记录实际部署 commit 和测试组合，再决定是否升级；不要把主线 benchmark 自动归入现有正式版。CI 资源受限时尤其要保留未验证范围。",
+      "sources": [
+        {
+          "name": "SMG Releases",
+          "url": "https://github.com/smg-project/smg/releases"
+        },
+        {
+          "name": "SMG #5567",
+          "url": "https://github.com/smg-project/smg/issues/5567"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "CoreWeave 11 月 9 日公告与 Wayve 达成多年协议，使用 Blackwell 云支持 AI Driver foundation model 的训练、评估及仿真。双方关系由 Weights & Biases 扩展到 CoreWeave Cloud。公告未披露合同金额、GPU 数量或收入确认节奏，这也不是推理业务收入披露。",
+    "judgment": "工具链合作延伸到基础设施采购值得跟踪，但不能据此量化新增算力需求或收入。判断商业兑现仍需合同规模、分期交付、服务承诺与利用率证据，并区分训练、仿真与线上推理负载。",
+    "sources": [
+      {
+        "name": "CoreWeave 与 Wayve 多年协议公告",
+        "url": "https://www.coreweave.com/news/coreweave-to-power-wayves-ai-driver-training-in-multi-year-agreement"
+      }
+    ]
+  },
+  "actions": [
+    "按实际 hybrid worker 比例复跑路由 benchmark，保持核绑定、相同编译参数和交错重复，避免跨 fleet 比较。",
+    "将 group_view_late 与 group_dropped 纳入验收，触发多 main signal 或 mask 边界时确认规则是否仍有效。",
+    "PP 升级分别测试 auto、nccl、copy_engine，确认每个 rank 选择一致，并覆盖单 stage 初始化失败。",
+    "用实际长短 prompt 和负载曲线复测 TTFT p99、输出一致性及显存，单独验证 Service 删除中的健康检查响应。"
+  ]
+}
