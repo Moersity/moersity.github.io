@@ -1,0 +1,97 @@
+{
+  "date": "2026-11-11",
+  "title": "SMG 1.15 改变默认执行栈，Prefill-only draft KV 开始回收冗余显存",
+  "deck": "SMG 新正式版要求先升级网关并核对 Rust servicer、负载流与配置变更；后续主线 policy engine 尚未接管路由。vLLM 将 DFlash 类 prefill 的上下文 KV 生产与实际 drafting 分离，收益与验证范围须逐项核对。",
+  "top_items": [
+    {
+      "title": "SMG 1.15：先升级网关，再切换默认 Rust servicer",
+      "summary": "v1.15.0 于 11 月 10 日 07:17 UTC 发布。vLLM、TokenSpeed、SGLang 默认使用 Rust servicer，TensorRT-LLM 保留 Python；官方要求先滚动升级 gateway，再安装 smg 1.15.0 与 smg-grpc-servicer 0.16.0。gRPC worker 开始流式上报 load，1.14 servicer 仍走轮询；旧 least-load waiting 配置会被拒绝。",
+      "judgment": "升级重点是兼容顺序、配置拒绝与真实负载行为，不只看 tokenizer 微基准。官方端到端表中两个已测模型在目标 TTFT 下容量持平，且记录了换机和闭环负载下的退步；不能概括为整个 serving 栈统一提速。",
+      "sources": [
+        {
+          "name": "SMG v1.15.0 正式发布",
+          "url": "https://github.com/smg-project/smg/releases/tag/v1.15.0"
+        }
+      ]
+    },
+    {
+      "title": "vLLM：Prefill-only DFlash 路径不再预留实际 drafting 资源",
+      "summary": "#65217 于 11 月 10 日 17:01 UTC 合并，新增显式 prefill_context_kv_only：支持的 DFlash 类 speculator 仅生成 decode 需要的 context KV，不调度 drafts、不留 lookahead、不捕获 draft CUDA graph；具备 context_kv_modules 声明的模型还能释放无用 draft 权重。num_speculative_tokens 保持不变以维持传输状态尺寸。",
+      "judgment": "作者 GB300 1P1D、Qwen3-8B 的 24 个请求中输出一致，prefill KV 容量增加 4.8%，这不是吞吐增幅。27B 组合在当前 main 和 PR 上均无法启动 NIXL，历史 8.7% 不能当作当前结果；普通直连该 prefill 的 decode 请求将不使用 speculation。",
+      "sources": [
+        {
+          "name": "vLLM #65217",
+          "url": "https://github.com/vllm-project/vllm/pull/65217"
+        }
+      ]
+    },
+    {
+      "title": "SMG policy engine 有了 host，但还没有接管 placement",
+      "summary": "#5625 于 11 月 10 日 21:18 UTC 合并，引入 --policy-engine legacy|engine，默认仍为 legacy。engine 模式构建 Decider、接收 load feed、从实时 worker 状态生成 view，并提供决策与提交接口，但尚无 placement site 通过它路由。",
+      "judgment": "这是架构接线而非流量切换，也不能宣称提速。PR 的单核微基准中新增 view 构建存在成本；下一步验收应等实际 placement 接入后再比较语义、锁边界和端到端表现。该合并晚于 1.15 发布，需与正式版区分。",
+      "sources": [
+        {
+          "name": "SMG #5625",
+          "url": "https://github.com/smg-project/smg/pull/5625"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "vLLM #64742 于 11 月 10 日 23:51 UTC 合并，修正 Rust frontend 的取消竞态：Abort 若早于 Add 到达会被 scheduler 忽略，现在让 output stream 留在发送 Add 的异步任务中，待发送完成再 drop 触发 abort。SGLang #48117 于 22:17 UTC 合并，对 DSPARK/DFLASH grammar 拒绝 draft token 时的 ValueError 进行局部分支剪除，保留 sibling branches，避免异常杀死 engine。",
+    "judgment": "两者都要求关注请求生命周期而非只看成功路径。前者应验证取消与 Add 顺序；后者是故障 containment，不是根因同步修复，已有 CPU mock red/green 不能代表全 GPU 验证。",
+    "sources": [
+      {
+        "name": "vLLM #64742",
+        "url": "https://github.com/vllm-project/vllm/pull/64742"
+      },
+      {
+        "name": "SGLang #48117",
+        "url": "https://github.com/sgl-project/sglang/pull/48117"
+      }
+    ]
+  },
+  "backend": {
+    "content": "SMG #5661 于 11 月 10 日 22:13 UTC 合并，将 Go bindings module 修正为 github.com/smg-project/smg/bindings/golang，内部 import、示例和发布说明同步更新。作者已验证按 commit 的 go get 可解析，但首个 bindings/golang/v1.16.0 tag 及自动发布工作流仍待完成，不能称为 1.16 已发布。 Kubernetes #144031 同日 23:27 UTC 合并，在 InPlacePodVerticalScalingSchedulerPreemption feature gate 下，同优先级 pending resize 优先处理 PreemptLowerPriority，再处理 Never，以减少资源被非抢占 Pod 先占回后引发的多余驱逐。未核验已纳入正式版本。",
+    "judgment": "Go 子目录模块同时需要正确 module path 与子目录版本 tag。按 commit 解析成功不代表版本 tag 可安装；FFI 库还应从相同 checkout 构建，验收要包含 CGO 链接与真实 endpoint，不能只看跳过 live 测试后的单测通过。",
+    "sources": [
+      {
+        "name": "SMG #5661",
+        "url": "https://github.com/smg-project/smg/pull/5661"
+      },
+      {
+        "name": "Kubernetes #144031",
+        "url": "https://github.com/kubernetes/kubernetes/pull/144031"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "用 KV 生产角色而非名称判断 prefill-only 兼容",
+      "summary": "vLLM #65217 明确不依赖 kv_role 单独推断 prefill 身份：带 MultiConnector 的 prefill 可能是 kv_both。新选项必须显式启用，要求可生产 KV，并关闭 adaptive verification 与 dynamic speculative decoding；不支持的 speculator 会拒绝，draft 权重更新也被拒绝。",
+      "judgment": "将 connector 组合、完整 prefix hit、空闲 DP rank 和直接发到 prefill 的请求纳入回归。既要比 context KV 字节与 decode 输出，也要确认节省来自正确的权重、图和 lookahead 生命周期。",
+      "sources": [
+        {
+          "name": "vLLM #65217 设计与验证",
+          "url": "https://github.com/vllm-project/vllm/pull/65217"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "AMD 11 月 10 日宣布第六代 EPYC（Zen 6、SP7）正式上市。公告将 AI 与企业计算作为应用方向，并讨论 CPU、内存和 I/O 对 AI 系统的影响。其 CPU offload 的部分提升数字来自第五代实测再按第六代带宽推算，不能当作第六代整机直接实测。",
+    "judgment": "采购评估应将 CPU offload 路径、PCIe/内存带宽和实际模型放在同一套系统测试中。新品上市是供给侧事件，不自动证明现有推理服务受益；优先索取相同模型、GPU、软件栈与并发下的端到端结果，不将估计上限当作承诺。",
+    "sources": [
+      {
+        "name": "AMD 第六代 EPYC 官方公告",
+        "url": "https://newsroom.amd.com/news/6th-gen-epyc-lead-ai-enterprise-computing/"
+      }
+    ]
+  },
+  "actions": [
+    "按 gateway→engine servicer 顺序制定 SMG 1.15 升级计划，删除已废弃 least-load waiting 配置并检查 Helm startup probe 预算。",
+    "比较负载流开启前后实际 placement 与排队，区分旧 servicer 轮询和新 load streaming。",
+    "Prefill-only 回归覆盖 MultiConnector kv_both、prefix 全命中、空闲 DP rank 和直接 decode，单独记录显存容量与吞吐。",
+    "Go bindings 锁定 commit 与对应 FFI 库，验证版本 tag 真正存在后再切换版本安装；不要把新 policy engine host 当作已接管路由。"
+  ]
+}
