@@ -1,0 +1,97 @@
+{
+  "date": "2026-11-13",
+  "title": "PD logprob 要按 SSE 帧合并，旧 Worker 删除不能误停新订阅",
+  "deck": "SMG 修复网络 chunk 与 SSE frame 混淆、同 URL Worker 替换中的 KV 订阅竞态；vLLM 将结构化推测解码的同步事件按 batch 隔离。今天关注协议边界、对象身份与流水线依赖，性能数字保留具体配置。",
+  "top_items": [
+    {
+      "title": "SMG：PD logprob 合并以 SSE frame 为单位",
+      "summary": "#6009 于 11 月 12 日 20:49 UTC 合并。decode hook 不再把一个网络 chunk 当作一个 data frame：同 chunk 多帧分别合并，跨 chunk 的未完整 frame 等待后续数据，stream 结束或错误事件前调用 finish。超过 MAX_FRAME_BYTES 的 frame 及剩余部分仍原样透传。",
+      "judgment": "这补齐昨天 Content-Length 修复之外的另一层协议边界。应测试多帧合包、单帧拆包、EOF 未满帧及超界透传，不能宣称所有超大 frame 都会合并 prefill logprob；不请求 logprob 的路径保持原行为。",
+      "sources": [
+        {
+          "name": "SMG #6009",
+          "url": "https://github.com/smg-project/smg/pull/6009"
+        }
+      ]
+    },
+    {
+      "title": "SMG：删除旧 Worker 时核对订阅真正属于谁",
+      "summary": "#6081 于 11 月 12 日 20:50 UTC 合并。旧 worker 从 registry 移除后，同 URL 的新实例可能先注册并重启 KV stream，迟到的删除通知过去会停掉新 stream。现在删除侧在 slot lock 内核对 registry 对象身份，保留当前实例拥有的订阅。",
+      "judgment": "URL 相同不等于对象相同。回归应控制删除、重注册和 stream 替换的顺序，确认新实例持续收事件，旧实例仍正确终止。作者 114 个 monitor 测试重复三轮、4641 个 library 测试通过，不应据此推断吞吐收益。",
+      "sources": [
+        {
+          "name": "SMG #6081",
+          "url": "https://github.com/smg-project/smg/pull/6081"
+        }
+      ]
+    },
+    {
+      "title": "vLLM：draft-token 拷贝事件按 batch 隔离",
+      "summary": "#64531 于 11 月 13 日 00:31 UTC 合并。structured outputs、spec decode 与 async scheduling 组合中，单一 CUDA event 会让读取旧 batch draft tokens 的 scheduler 误等较新 batch 的拷贝；改为每 batch 独立 barrier，减少 PP 调度空泡。",
+      "judgment": "作者 B200、DeepSeek-V4-Flash、DSpark 7 draft tokens、TP=1/PP=2、并发 64 下，tight constraints 吞吐增幅 2.68%，broad 为 1.04%；TP=2/PP=1 未见显著变化。不能将标题的约 3% 泛化到所有结构化输出部署。",
+      "sources": [
+        {
+          "name": "vLLM #64531",
+          "url": "https://github.com/vllm-project/vllm/pull/64531"
+        }
+      ]
+    }
+  ],
+  "engineering": {
+    "content": "vLLM #66063 于 11 月 12 日 21:40 UTC 合并，将 draft model 在最后一个 PP rank 内按 single_pp_stage 构建与运行，避免继承 target 的 pipeline stage；同时处理 EAGLE-1/XPress layer name 冲突及部分 draft loader hangs。target 的层划分不再错误约束单阶段 draft。",
+    "judgment": "dummy weights 只证明启动和 drafting 路径，不证明 acceptance 或模型质量。OPT 的 CUDA graph padding 仍依赖另一个修复，不能写成所有架构与加载器组合完全可用；需分别测试实际权重、PP/TP 拓扑、冷启动与 daemon warm restart。",
+    "sources": [
+      {
+        "name": "vLLM #66063",
+        "url": "https://github.com/vllm-project/vllm/pull/66063"
+      }
+    ]
+  },
+  "backend": {
+    "content": "Kubernetes #143313 于 11 月 12 日 23:53 UTC 合并，为 kubectl drain 写入 DrainInProgress 与 Drained Node conditions，并在 uncordon 时清理，让维护控制器可以观察节点排空状态。此处为主线改动，尚未核验已包含在哪个正式发行版本。 Rust 1.100.0 于 11 月 12 日发布，稳定 Allocator 核心 trait、DropGuard 与 never type；旧 edition 的 never-type fallback 从 () 调整为 !，Cargo build-dir hash 布局也有变化。",
+    "judgment": "维护自动化应区分排空中、完成和失败，不能仅凭节点不可调度就认定 drain 成功。跨版本操作前核对 kubectl 与控制器的条件处理逻辑，测试中断、重试和 uncordon 后状态清理。 Rust 升级同时回归类型推断与依赖 target/build 目录细节的脚本，不把新 API 稳定等同于应用无需兼容测试。",
+    "sources": [
+      {
+        "name": "Kubernetes #143313",
+        "url": "https://github.com/kubernetes/kubernetes/pull/143313"
+      },
+      {
+        "name": "Rust 1.100.0 官方发布",
+        "url": "https://blog.rust-lang.org/2026/11/12/Rust-1.100.0/"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "title": "SMG overload veto 的 mock 回归需要真实负载复验",
+      "summary": "本轮检查 SMG 近期 PR、合并、Release 与重要 Issue；最新正式版仍是 v1.15.0。新 Issue #5970 使用 32-worker、uncalibrated mock、cache_aware 加 gRPC KV events、legacy 路径报告默认 overload veto 对 SLO 的影响，并不是真实 GPU 吞吐基准。",
+      "judgment": "可将其作为路由保护策略验收提示，检查限流、fallback 与 SLO 的相互作用；不能据 mock 报告建议直接关闭生产保护，也不能将后续主线修复视作 1.15 已发布内容。",
+      "sources": [
+        {
+          "name": "SMG #5970",
+          "url": "https://github.com/smg-project/smg/issues/5970"
+        },
+        {
+          "name": "SMG v1.15.0",
+          "url": "https://github.com/smg-project/smg/releases/tag/v1.15.0"
+        }
+      ]
+    }
+  ],
+  "industry": {
+    "content": "IBM 11 月 12 日宣布 Spectrum Collective 正式可用，整合 Spectrum LSF、Symphony 与 Conductor，面向 AI、HPC 和 analytics，提供异构 CPU/GPU 工作负载的策略、优先级与混合环境调度。公告没有给出可独立比较的实测利用率、吞吐或成本数据。",
+    "judgment": "该产品方向显示资源调度与工作负载整合继续成为平台竞争的一部分。采购时应要求自身任务的排队时间、隔离、故障恢复与成本验证，不能仅凭统一平台叙述认定性能提升，也不能推断其取代 Kubernetes 或具备公告未说明的集成。",
+    "sources": [
+      {
+        "name": "IBM Spectrum Collective 发布公告",
+        "url": "https://www.ibm.com/new/announcements/introducing-ibm-spectrum-collective-unified-orchestration-and-optimization-for-any-workload-on-any-hardware-anywhere"
+      }
+    ]
+  },
+  "actions": [
+    "对 PD logprob 流组合测试多帧同 chunk、跨 chunk、EOF 和超 MAX_FRAME_BYTES，逐帧比较 prefill 合并结果。",
+    "同 URL 重注册时交错旧 removal 与新 subscription，确认按实例身份保留新 KV stream。",
+    "结构化推测解码用实际 PP/TP、约束强度与并发复测，单独记录同步等待及吞吐，避免套用统一提升比例。",
+    "draft 单阶段升级回归真实权重与加载器，区分能启动、输出一致和 acceptance，不把 dummy 验证当质量结论。"
+  ]
+}
